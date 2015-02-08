@@ -1,0 +1,44 @@
+body {
+  font-family: Helvetica;
+  font-size: 11pt;
+}
+
+.node {
+  text-align: center;
+  display: inline-block;
+}
+
+.children, .children * {
+  display: inline-block;
+  background: linear-gradient(white, #ccddff);
+  border: 1px solid black;
+  border-radius: 4px;
+  margin: 2px;
+  margin-top: 0;
+  padding: 2px;
+}
+
+.relationships {
+  margin-top: 2.5em;
+}
+
+.relationships span {
+  margin-left: 0.5em;
+  margin-right: 0.5em;
+}
+
+svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+line {
+  stroke: black;
+}
+
+text {
+  fill: blue;
+  font-size: 9pt;
+}

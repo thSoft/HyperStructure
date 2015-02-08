@@ -1,0 +1,6 @@
+{
+  "name": "HyperStructure",
+  "dependencies": {
+    "SvgConnectors": "https://github.com/thSoft/SvgConnectors.git"
+  }
+}

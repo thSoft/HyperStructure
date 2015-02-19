@@ -7,30 +7,40 @@ import HyperStructure.View (..)
 import Graphics.Collage (..)
 import Mouse
 import Html (..)
+import Html
 import Html.Attributes (..)
 
-main : Html
-main = node |> viewNode
+main : Signal Html
+main = map view editorState
 
+view : EditorState -> Html
+view editorState = node |> viewNode editorState
+
+foo : Node
+foo =
+  {
+    id = "foo",
+    children = [
+      ContentChild { content = "foo" |> text }
+    ],
+    relationships = [
+      Relationship {
+        text = "value",
+        node = "42" |> textNode "value of foo"
+      }
+    ],
+    commands = []
+  }
+
+node : Node
 node =
   {
     id = "main expression",
     children = [
       NodeChild {
-        node = {
-          id = "foo",
-          children = [
-            TextChild { text = "foo" }
-          ],
-          relationships = [
-            Relationship {
-              text = "value",
-              node = "42" |> textNode "value of foo"
-            }
-          ]
-        }
+        node = foo
       },
-      TextChild { text = "+" },
+      ContentChild { content = "+" |> text },
       NodeChild {
         node = {
           id = "subexpression",
@@ -39,28 +49,31 @@ node =
               node = {
                 id = "literal",
                 children = [
-                  TextChild { text = "2" }
+                  ContentChild { content = "2" |> text }
                 ],
-                relationships = []
+                relationships = [],
+                commands = []
               }
             },
-            TextChild { text = "*" },
+            ContentChild { content = "*" |> text },
             NodeChild {
               node = {
                 id = "bar",
                 children = [
-                  TextChild { text = "bar" }
+                  ContentChild { content = "bar" |> text }
                 ],
                 relationships = [
                   Relationship {
                     text = "value",
                     node = "1" |> textNode "value of bar"
                   }
-                ]
+                ],
+                commands = []
               }
             }
           ],
-          relationships = []
+          relationships = [],
+          commands = []
         }
       }
     ],
@@ -73,7 +86,8 @@ node =
         text = "type",
         node = "number" |> textNode "type of main expression"
       }
-    ]
+    ],
+    commands = []
   }
 
 textNode : String -> String -> Node
@@ -81,7 +95,8 @@ textNode id text =
   {
     id = id,
     children = [
-      TextChild { text = text }
+      ContentChild { content = text |> Html.text }
     ],
-    relationships = []
+    relationships = [],
+    commands = []
   }

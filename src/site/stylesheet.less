@@ -8,7 +8,7 @@ body {
   display: inline-block;
 }
 
-.children, .children * {
+.children {
   display: inline-block;
   background: linear-gradient(white, #ccddff);
   border: 1px solid black;
@@ -16,6 +16,13 @@ body {
   margin: 2px;
   margin-top: 0;
   padding: 2px;
+}
+
+.selected {
+  background: linear-gradient(white, #bbeeff);
+  border: 2px solid brown;
+  box-shadow: 0 0 3px darkGray;
+  padding: 1px;
 }
 
 .relationships {
@@ -35,7 +42,12 @@ svg {
 }
 
 line {
-  stroke: black;
+  stroke: rgba(0, 0, 0, 0.25);
+  stroke-width: 2.5;
+}
+
+marker {
+  fill: rgba(0, 0, 0, 1);
 }
 
 text {

@@ -5,6 +5,6 @@ interface Elm {
 }
 
 window.onload = () => {
-  Elm.fullscreen(Elm.Main);
+  Elm.embed(Elm.Main, document.getElementById('main'));
   SvgConnectors.manage();
 }

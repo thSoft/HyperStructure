@@ -17,7 +17,10 @@ viewNode editorState node =
   let childNodes = node.children |> List.map (viewChild editorState)
       relatedNodes = node |> getAllRelationships |> List.map (viewRelationship editorState)
   in
-    div [class "node"] [
+    div [
+      class "node",
+      onClick (Select Nothing |> send editorCommands)
+    ][
       div (node |> attributes editorState) childNodes,
       div [class "relationships"] relatedNodes
     ]
@@ -29,17 +32,15 @@ attributes editorState node =
     classList [
       ("children", True),
       ("selected", node |> isSelected editorState)
-    ]
-  ] ++ handleSelection node
+    ],
+    onClick (Select (Just node) |> send editorCommands)
+  ]
 
 isSelected : EditorState -> Node -> Bool
 isSelected editorState node =
   case editorState.selection of
     Nothing -> False
     Just selectedNode -> node == selectedNode
-
-handleSelection : Node -> List Html.Attribute
-handleSelection node = [onClick ((Select node) |> send editorCommands)]
 
 viewChild : EditorState -> Child -> Html
 viewChild editorState child =
@@ -81,7 +82,7 @@ insertAtMiddle toInsert original =
 
 type EditorCommand =
   Nop |
-  Select Node
+  Select (Maybe Node)
 
 editorCommands : Channel EditorCommand
 editorCommands = channel Nop
@@ -93,7 +94,7 @@ updateEditorState : EditorCommand -> EditorState -> EditorState
 updateEditorState editorCommand editorState =
   case editorCommand of
     Nop -> editorState
-    Select node -> { editorState | selection <- Just node }
+    Select newSelection -> { editorState | selection <- newSelection }
 
 initialEditorState : EditorState
 initialEditorState =

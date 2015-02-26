@@ -16,6 +16,9 @@ main = map view editorState
 view : EditorState -> Html
 view editorState = node |> viewNode editorState
 
+mainCommands : Channel ()
+mainCommands = channel ()
+
 foo : Node
 foo =
   {
@@ -29,7 +32,17 @@ foo =
         node = "42" |> textNode "value of foo"
       }
     ],
-    commands = []
+    commands = [
+      Group {
+        text = "Show",
+        children = [
+          Command {
+            text = "Value",
+            message = (() |> send mainCommands)
+          }
+        ]
+      }
+    ]
   }
 
 node : Node

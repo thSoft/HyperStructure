@@ -36,6 +36,7 @@ type Command =
 type alias EditorState = {
   selection: Selection,
   menuActivated: Bool,
+  lastClickPosition: (Int, Int),
   inputText: String
 }
 

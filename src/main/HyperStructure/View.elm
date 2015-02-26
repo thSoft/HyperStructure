@@ -5,25 +5,65 @@ import List
 import Html (..)
 import Html
 import Html.Attributes (..)
+import Html.Attributes as Attr
 import Html.Events (..)
 import Svg (..)
 import Svg
 import Svg.Attributes as SvgAttr
 import HyperStructure.Model (..)
 import Signal (..)
+import Signal
+import Json.Decode (..)
+import Json.Decode
+import Mouse
 
 viewNode : EditorState -> Node -> Html
 viewNode editorState node =
   let childNodes = node.children |> List.map (viewChild editorState)
       relatedNodes = node |> getAllRelationships |> List.map (viewRelationship editorState)
+      menu = node |> viewMenu editorState
   in
     div [
       class "node",
       onClick (Select Nothing |> send editorCommands)
-    ][
-      div (node |> attributes editorState) childNodes,
+    ] ([
+      div (node |> attributes editorState) (childNodes ++ menu),
       div [class "relationships"] relatedNodes
+    ])
+
+viewMenu : EditorState -> Node -> List Html
+viewMenu editorState node =
+  if editorState.menuActivated && editorState.selection == Just node && not (node.commands |> isEmpty) then
+    [
+      div [
+        class "menu",
+        Attr.style [
+          ("left", editorState.lastClickPosition |> fst |> toPixel),
+          ("top", editorState.lastClickPosition |> snd |> toPixel)
+        ]
+      ] (node.commands |> List.map viewCommand)
     ]
+  else []
+
+toPixel : Int -> String
+toPixel a = (a |> toString) ++ "px"
+
+viewCommand : Command -> Html
+viewCommand command =
+  case command of
+    Command { text, message } ->
+      div [
+        class "menuitem",
+        onClick message,
+        onClick (ToggleMenu Nothing |> send editorCommands)
+      ] [Html.text text]
+    Group { text, children } ->
+      div [
+        class "menugroup"
+      ] [
+        span [class "caption"] [Html.text text],
+        div [class "submenu"] (children |> List.map viewCommand)
+      ]
 
 attributes : EditorState -> Node -> List Html.Attribute
 attributes editorState node =
@@ -33,7 +73,9 @@ attributes editorState node =
       ("children", True),
       ("selected", node |> isSelected editorState)
     ],
-    onClick (Select (Just node) |> send editorCommands)
+    onClick (Select (Just node) |> send editorCommands),
+    on "contextmenu" ("button" := int) (always (ToggleMenu (Just node) |> send editorCommands)),
+    attribute "oncontextmenu" "return false;"
   ]
 
 isSelected : EditorState -> Node -> Bool
@@ -47,7 +89,9 @@ viewChild editorState child =
   case child of
     ContentChild { content } -> content
     NodeChild { node } ->
-      span (node |> attributes editorState) (node.children |> List.map (viewChild editorState))
+      let children = node.children |> List.map (viewChild editorState)
+          menu = node |> viewMenu editorState 
+      in span (node |> attributes editorState) (children ++ menu)
 
 viewRelationship : EditorState -> (Node, Relationship) -> Html
 viewRelationship editorState (originalNode, relationship) =
@@ -82,24 +126,45 @@ insertAtMiddle toInsert original =
 
 type EditorCommand =
   Nop |
-  Select (Maybe Node)
+  Select (Maybe Node) |
+  ToggleMenu (Maybe Node)
 
 editorCommands : Channel EditorCommand
 editorCommands = channel Nop
 
 editorState : Signal EditorState
-editorState = foldp updateEditorState initialEditorState (editorCommands |> subscribe)
+editorState = Signal.map2 handleClick editorStateWithoutClick (Mouse.position |> sampleOn editorStateWithoutClick)
+
+editorStateWithoutClick : Signal EditorState
+editorStateWithoutClick = foldp updateEditorState initialEditorState (editorCommands |> subscribe)
 
 updateEditorState : EditorCommand -> EditorState -> EditorState
 updateEditorState editorCommand editorState =
   case editorCommand of
     Nop -> editorState
-    Select newSelection -> { editorState | selection <- newSelection }
+    Select newSelection ->
+      { editorState |
+        selection <- newSelection,
+        menuActivated <- False }
+    ToggleMenu newSelection ->
+      { editorState |
+        selection <- newSelection,
+        menuActivated <- newSelection |> isJust }
+
+isJust : Maybe a -> Bool
+isJust maybe =
+  case maybe of
+    Just _ -> True
+    Nothing -> False
 
 initialEditorState : EditorState
 initialEditorState =
   {
     selection = Nothing,
     menuActivated = False,
+    lastClickPosition = (0, 0),
     inputText = ""
   }
+
+handleClick : EditorState -> (Int, Int) -> EditorState
+handleClick editorState lastClickPosition = { editorState | lastClickPosition <- lastClickPosition}

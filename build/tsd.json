@@ -7,6 +7,12 @@
   "installed": {
     "elm/elm.d.ts": {
       "commit": "4abbdff87f05616cfc421e0bf46c54a0ffdc06ce"
+    },
+    "jquery.contextMenu/jquery.contextMenu.d.ts": {
+      "commit": "a7a25e72d9d176ccdd6445417d3449ffff49111f"
+    },
+    "jquery/jquery.d.ts": {
+      "commit": "a7a25e72d9d176ccdd6445417d3449ffff49111f"
     }
   }
 }

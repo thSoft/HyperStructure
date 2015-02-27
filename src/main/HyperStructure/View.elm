@@ -33,37 +33,28 @@ viewNode editorState node =
 
 viewMenu : EditorState -> Node -> List Html
 viewMenu editorState node =
-  if editorState.menuActivated && editorState.selection == Just node && not (node.commands |> isEmpty) then
-    [
-      div [
-        class "menu",
-        Attr.style [
-          ("left", editorState.lastClickPosition |> fst |> toPixel),
-          ("top", editorState.lastClickPosition |> snd |> toPixel)
-        ]
-      ] (node.commands |> List.map viewCommand)
-    ]
-  else []
+  [
+    menu [
+      id (node |> menuId),
+      attribute "type" "context"
+    ] (node.commands |> List.map viewCommand)
+  ]
 
-toPixel : Int -> String
-toPixel a = (a |> toString) ++ "px"
+menuId : Node -> String
+menuId node = node.id ++ "menu"
 
 viewCommand : Command -> Html
 viewCommand command =
   case command of
     Command { text, message } ->
-      div [
-        class "menuitem",
+      menuitem [
         onClick message,
-        onClick (ToggleMenu Nothing |> send editorCommands)
-      ] [Html.text text]
+        attribute "label" text
+      ] []
     Group { text, children } ->
-      div [
-        class "menugroup"
-      ] [
-        span [class "caption"] [Html.text text],
-        div [class "submenu"] (children |> List.map viewCommand)
-      ]
+      menu [
+        attribute "label" text
+      ] (children |> List.map viewCommand)
 
 attributes : EditorState -> Node -> List Html.Attribute
 attributes editorState node =
@@ -74,8 +65,7 @@ attributes editorState node =
       ("selected", node |> isSelected editorState)
     ],
     onClick (Select (Just node) |> send editorCommands),
-    on "contextmenu" ("button" := int) (always (ToggleMenu (Just node) |> send editorCommands)),
-    attribute "oncontextmenu" "return false;"
+    attribute "contextmenu" (node |> menuId)
   ]
 
 isSelected : EditorState -> Node -> Bool
@@ -126,30 +116,19 @@ insertAtMiddle toInsert original =
 
 type EditorCommand =
   Nop |
-  Select (Maybe Node) |
-  ToggleMenu (Maybe Node)
+  Select (Maybe Node)
 
 editorCommands : Channel EditorCommand
 editorCommands = channel Nop
 
 editorState : Signal EditorState
-editorState = Signal.map2 handleClick editorStateWithoutClick (Mouse.position |> sampleOn editorStateWithoutClick)
-
-editorStateWithoutClick : Signal EditorState
-editorStateWithoutClick = foldp updateEditorState initialEditorState (editorCommands |> subscribe)
+editorState = foldp updateEditorState initialEditorState (editorCommands |> subscribe)
 
 updateEditorState : EditorCommand -> EditorState -> EditorState
 updateEditorState editorCommand editorState =
   case editorCommand of
     Nop -> editorState
-    Select newSelection ->
-      { editorState |
-        selection <- newSelection,
-        menuActivated <- False }
-    ToggleMenu newSelection ->
-      { editorState |
-        selection <- newSelection,
-        menuActivated <- newSelection |> isJust }
+    Select newSelection -> { editorState | selection <- newSelection }
 
 isJust : Maybe a -> Bool
 isJust maybe =
@@ -161,10 +140,5 @@ initialEditorState : EditorState
 initialEditorState =
   {
     selection = Nothing,
-    menuActivated = False,
-    lastClickPosition = (0, 0),
     inputText = ""
   }
-
-handleClick : EditorState -> (Int, Int) -> EditorState
-handleClick editorState lastClickPosition = { editorState | lastClickPosition <- lastClickPosition}

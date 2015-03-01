@@ -2,6 +2,8 @@ module HyperStructure.View where
 
 import List (..)
 import List
+import Maybe (..)
+import Maybe
 import Html (..)
 import Html
 import Html.Attributes (..)
@@ -10,26 +12,79 @@ import Html.Events (..)
 import Svg (..)
 import Svg
 import Svg.Attributes as SvgAttr
-import HyperStructure.Model (..)
 import Signal (..)
 import Signal
 import Json.Decode (..)
 import Json.Decode
 import Mouse
+import Char (..)
+import String (..)
+import String
+import HyperStructure.Model (..)
 
 viewNode : EditorState -> Node -> Html
 viewNode editorState node =
-  let childNodes = node.children |> List.map (viewChild editorState)
-      relatedNodes = node |> getAllRelationships |> List.map (viewRelationship editorState)
-      menu = node |> viewMenu editorState
+  let relatedNodes = node |> getAllRelationships |> List.map (viewRelationship editorState)
   in
     div [
       class "node",
       onClick (Select Nothing |> send editorCommands)
-    ] ([
-      div (node |> attributes editorState) (childNodes ++ menu),
+    ] [
+      node |> viewChildren editorState,
       div [class "relationships"] relatedNodes
-    ])
+    ]
+
+viewChildren : EditorState -> Node -> Html
+viewChildren editorState node =
+  let viewChild child =
+        case child of
+          ContentChild { content } -> content
+          NodeChild nodeChild -> nodeChild.node |> viewChildren editorState
+      children = node.children |> List.map viewChild
+      menu = node |> viewMenu editorState
+      onInput string = Type { input = string, first = False} |> send editorCommands
+      onKeyPress key =
+        let editorCommand = if key == "Esc" then Type { input = "", first = False } else Nop
+        in editorCommand |> send editorCommands
+      inputField =
+        if (editorState.selection == Just node) && not (editorState.inputText |> String.isEmpty) then
+          [
+            input [
+              id inputFieldId,
+              Attr.value editorState.inputText,
+              on "input" targetValue onInput,
+              on "keypress" ("key" := string) onKeyPress
+            ] []
+          ]
+        else []
+  in span (node |> attributes editorState) (children ++ menu ++ inputField)
+
+inputFieldId = "commandInput"
+
+attributes : EditorState -> Node -> List Html.Attribute
+attributes editorState node =
+  let selected =
+        case editorState.selection of
+          Nothing -> False
+          Just selectedNode -> node == selectedNode
+      onKeyPress key =
+        let editorCommand =
+              if ((key |> String.length) == 1) && (editorState.inputText |> String.isEmpty) then
+                Type { input = key, first = True }
+              else Nop
+        in editorCommand |> send editorCommands
+  in
+    [
+      id node.id,
+      classList [
+        ("children", True),
+        ("selected", selected)
+      ],
+      on "keypress" ("key" := string) onKeyPress,
+      onClick (Select (Just node) |> send editorCommands),
+      tabindex 0,
+      attribute "contextmenu" (node |> menuId)
+    ]
 
 viewMenu : EditorState -> Node -> List Html
 viewMenu editorState node =
@@ -56,33 +111,6 @@ viewCommand command =
         attribute "label" text
       ] (children |> List.map viewCommand)
 
-attributes : EditorState -> Node -> List Html.Attribute
-attributes editorState node =
-  [
-    id node.id,
-    classList [
-      ("children", True),
-      ("selected", node |> isSelected editorState)
-    ],
-    onClick (Select (Just node) |> send editorCommands),
-    attribute "contextmenu" (node |> menuId)
-  ]
-
-isSelected : EditorState -> Node -> Bool
-isSelected editorState node =
-  case editorState.selection of
-    Nothing -> False
-    Just selectedNode -> node == selectedNode
-
-viewChild : EditorState -> Child -> Html
-viewChild editorState child =
-  case child of
-    ContentChild { content } -> content
-    NodeChild { node } ->
-      let children = node.children |> List.map (viewChild editorState)
-          menu = node |> viewMenu editorState 
-      in span (node |> attributes editorState) (children ++ menu)
-
 viewRelationship : EditorState -> (Node, Relationship) -> Html
 viewRelationship editorState (originalNode, relationship) =
   case relationship of 
@@ -105,18 +133,22 @@ getAllRelationships node =
         case child of
           ContentChild _ -> []
           NodeChild { node } -> node |> getAllRelationships
-  in childRelationships |> insertAtMiddle [ownRelationships] |> concat
+  in childRelationships |> insertAtMiddle [ownRelationships] |> List.concat
 
 insertAtMiddle : List a -> List a -> List a
 insertAtMiddle toInsert original =
-  let half = (original |> length) // 2
+  let half = (original |> List.length) // 2
       firstHalf = original |> take half
       secondHalf = original |> drop half
-  in [firstHalf, toInsert, secondHalf] |> concat  
+  in [firstHalf, toInsert, secondHalf] |> List.concat
 
 type EditorCommand =
   Nop |
-  Select (Maybe Node)
+  Select (Maybe Node) |
+  Type {
+    input: String,
+    first: Bool
+  }
 
 editorCommands : Channel EditorCommand
 editorCommands = channel Nop
@@ -128,13 +160,8 @@ updateEditorState : EditorCommand -> EditorState -> EditorState
 updateEditorState editorCommand editorState =
   case editorCommand of
     Nop -> editorState
-    Select newSelection -> { editorState | selection <- newSelection }
-
-isJust : Maybe a -> Bool
-isJust maybe =
-  case maybe of
-    Just _ -> True
-    Nothing -> False
+    Select newSelection -> { editorState | selection <- newSelection, inputText <- "" }
+    Type { input } -> { editorState | inputText <- input }
 
 initialEditorState : EditorState
 initialEditorState =
@@ -142,3 +169,14 @@ initialEditorState =
     selection = Nothing,
     inputText = ""
   }
+
+focusSignal : Signal String
+focusSignal =
+  let toFocus editorCommand currentEditorState =
+        case editorCommand of
+          Type { input, first } ->
+            if first then inputFieldId
+            else if input |> String.isEmpty then currentEditorState.selection |> Maybe.map .id |> withDefault ""
+            else ""
+          _ -> ""
+  in Signal.map2 toFocus (editorCommands |> subscribe) editorState

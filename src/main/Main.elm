@@ -2,19 +2,23 @@ module Main where
 
 import Signal (..)
 import Signal
-import HyperStructure.Model (..)
-import HyperStructure.View (..)
 import Graphics.Collage (..)
 import Mouse
 import Html (..)
 import Html
 import Html.Attributes (..)
+import Graphics.Input.Field (..)
+import HyperStructure.Model (..)
+import HyperStructure.View (..)
 
 main : Signal Html
-main = map view editorState
+main = map2 view editorState (constant node)
 
-view : EditorState -> Html
-view editorState = node |> viewNode editorState
+view : EditorState -> Node -> Html
+view editorState node = node |> viewNode editorState
+
+port focus : Signal String
+port focus = focusSignal
 
 mainCommands : Channel ()
 mainCommands = channel ()

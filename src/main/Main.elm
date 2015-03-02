@@ -46,6 +46,16 @@ foo =
           }
         ]
       }
+    ],
+    commandsWithInput input = [
+      Command {
+        text = "Rename to " ++ input,
+        message = (() |> send mainCommands)
+      },
+      Command {
+        text = "Surround with " ++ input,
+        message = (() |> send mainCommands)
+      }
     ]
   }
 
@@ -69,7 +79,7 @@ node =
                   ContentChild { content = "2" |> text }
                 ],
                 relationships = [],
-                commands = []
+                commands = [], commandsWithInput = always []
               }
             },
             ContentChild { content = "*" |> text },
@@ -85,12 +95,12 @@ node =
                     node = "1" |> textNode "value of bar"
                   }
                 ],
-                commands = []
+                commands = [], commandsWithInput = always []
               }
             }
           ],
           relationships = [],
-          commands = []
+          commands = [], commandsWithInput = always []
         }
       }
     ],
@@ -104,7 +114,7 @@ node =
         node = "number" |> textNode "type of main expression"
       }
     ],
-    commands = []
+    commands = [], commandsWithInput = always []
   }
 
 textNode : String -> String -> Node
@@ -115,5 +125,5 @@ textNode id text =
       ContentChild { content = text |> Html.text }
     ],
     relationships = [],
-    commands = []
+    commands = [], commandsWithInput = always []
   }

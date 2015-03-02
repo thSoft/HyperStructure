@@ -7,7 +7,8 @@ type alias Node = {
   id: String,
   children: List Child,
   relationships: List Relationship,
-  commands: List Command
+  commands: List Command,
+  commandsWithInput: String -> List Command
 }
 
 type Child =

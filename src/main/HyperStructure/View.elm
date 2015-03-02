@@ -46,18 +46,25 @@ viewChildren editorState node =
       onKeyPress key =
         let editorCommand = if key == "Esc" then Type { input = "", first = False } else Nop
         in editorCommand |> send editorCommands
-      inputField =
+      commandsWithInput =
         if (editorState.selection == Just node) && not (editorState.inputText |> String.isEmpty) then
           [
-            input [
-              id inputFieldId,
-              Attr.value editorState.inputText,
-              on "input" targetValue onInput,
-              on "keypress" ("key" := string) onKeyPress
-            ] []
+            div [
+              class "commandsWithInput"
+            ] [
+              input [
+                id inputFieldId,
+                Attr.value editorState.inputText,
+                on "input" targetValue onInput,
+                on "keypress" ("key" := string) onKeyPress
+              ] [],
+              span [
+                class "commands"
+              ] (node.commandsWithInput editorState.inputText |> List.map viewCommandWithInput)
+            ]
           ]
         else []
-  in span (node |> attributes editorState) (children ++ menu ++ inputField)
+  in span (node |> attributes editorState) (children ++ menu ++ commandsWithInput)
 
 inputFieldId = "commandInput"
 
@@ -110,6 +117,16 @@ viewCommand command =
       menu [
         attribute "label" text
       ] (children |> List.map viewCommand)
+
+viewCommandWithInput : Command -> Html
+viewCommandWithInput command =
+  case command of
+    Command { text, message } ->
+      div [
+        onClick message
+      ] [Html.text text]
+    Group { text, children } ->
+      div [] (children |> List.map viewCommandWithInput)
 
 viewRelationship : EditorState -> (Node, Relationship) -> Html
 viewRelationship editorState (originalNode, relationship) =

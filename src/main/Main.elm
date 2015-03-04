@@ -1,7 +1,10 @@
 module Main where
 
+import String (..)
 import Signal (..)
 import Signal
+import List (..)
+import List
 import Graphics.Collage (..)
 import Mouse
 import Html (..)
@@ -12,7 +15,7 @@ import HyperStructure.Model (..)
 import HyperStructure.View (..)
 
 main : Signal Html
-main = map2 view editorState (constant node)
+main = Signal.map2 view editorState (constant node)
 
 view : EditorState -> Node -> Html
 view editorState node = node |> viewNode editorState
@@ -20,8 +23,14 @@ view editorState node = node |> viewNode editorState
 port focus : Signal String
 port focus = focusSignal
 
-mainCommands : Channel ()
-mainCommands = channel ()
+mainCommands : Channel MainCommand
+mainCommands = channel Nop
+
+type MainCommand =
+  Nop |
+  ShowValue |
+  Rename |
+  Replace
 
 foo : Node
 foo =
@@ -41,23 +50,34 @@ foo =
         text = "Show",
         children = [
           Command {
+            id = ["Show", "Value"],
             text = "Value",
-            message = (() |> send mainCommands)
+            message = (ShowValue |> send mainCommands)
           }
         ]
       }
     ],
     commandsWithInput input = [
       Command {
+        id = ["Rename"],
         text = "Rename to " ++ input,
-        message = (() |> send mainCommands)
+        message = (Rename |> send mainCommands)
       },
-      Command {
-        text = "Surround with " ++ input,
-        message = (() |> send mainCommands)
+      Group {
+        text = "Replace with...",
+        children =
+          methods |> List.filter (contains input) |> List.map (\method ->
+            Command {
+              id = ["Replace", method],
+              text = method,
+              message = (Replace |> send mainCommands)
+            }
+          )
       }
     ]
   }
+
+methods = ["plus", "minus"]
 
 node : Node
 node =

@@ -25,18 +25,24 @@ type Relationship = Relationship {
 }
 
 type Command =
-  Command {
-    text: String,
-    message: Message
-  } |
+  Command CommandInfo |
   Group {
     text: String,
     children: List Command
   }
 
+type alias CommandInfo = {
+  id: CommandId,
+  text: String,
+  message: Message
+}
+
+type alias CommandId = List String
+
 type alias EditorState = {
   selection: Selection,
-  inputText: String
+  inputText: String,
+  selectedCommandId: Maybe CommandId
 }
 
 type alias Selection = Maybe Node

@@ -36,44 +36,90 @@ viewNode editorState node =
 
 viewChildren : EditorState -> Node -> Html
 viewChildren editorState node =
-  let viewChild child =
-        case child of
-          ContentChild { content } -> content
-          NodeChild nodeChild -> nodeChild.node |> viewChildren editorState
-      children = node.children |> List.map viewChild
+  let children =
+        node.children |> List.map (\child ->
+          case child of
+            ContentChild { content } -> content
+            NodeChild nodeChild -> nodeChild.node |> viewChildren editorState
+        )
       menu = node |> viewMenu editorState
-      onInput string = Type { input = string, first = False} |> send editorCommands
+      onInput string = Type { input = string, first = False } |> send editorCommands
+      commandsWithInput = editorState.inputText |> node.commandsWithInput
+      onEnter = editorState.inputText |> node.commandsWithInput |> findCommandInfo editorState.selectedCommandId |> Maybe.map .message |> withDefault (Nop |> send editorCommands)
       onKeyPress key =
-        let editorCommand = if key == "Esc" then Type { input = "", first = False } else Nop
-        in editorCommand |> send editorCommands
-      commandsWithInput =
+        case key of
+          "Esc" -> Type { input = "", first = False } |> send editorCommands
+          "Down" -> SelectCommand (moveCommandSelectionBy editorState commandsWithInput 1) |> send editorCommands
+          "Up" -> SelectCommand (moveCommandSelectionBy editorState commandsWithInput -1) |> send editorCommands
+          "Enter" -> onEnter
+          _ -> Nop |> send editorCommands
+      commandsWithInputView =
         if (editorState.selection == Just node) && not (editorState.inputText |> String.isEmpty) then
           [
             div [
-              class "commandsWithInput"
+              class "commandsWithInput",
+              on "keypress" ("key" := string) onKeyPress
             ] [
               input [
                 id inputFieldId,
                 Attr.value editorState.inputText,
-                on "input" targetValue onInput,
-                on "keypress" ("key" := string) onKeyPress
+                on "input" targetValue onInput
               ] [],
               span [
                 class "commands"
-              ] (node.commandsWithInput editorState.inputText |> List.map viewCommandWithInput)
+              ] (commandsWithInput |> List.map (viewCommandWithInput editorState))
             ]
           ]
         else []
-  in span (node |> attributes editorState) (children ++ menu ++ commandsWithInput)
+  in span (node |> attributes editorState) (children ++ menu ++ commandsWithInputView)
+
+moveCommandSelectionBy : EditorState -> List Command -> Int -> Maybe CommandId
+moveCommandSelectionBy editorState commandsWithInput offset =
+  let commandInfosWithIndex = commandsWithInput |> collectCommandInfos |> indexedMap (,)
+      stepIndex index = (index + offset) % (commandInfosWithIndex |> List.length)
+  in commandInfosWithIndex |> indexOf editorState.selectedCommandId |> stepIndex |> findCommandIdByIndex commandInfosWithIndex
+
+collectCommandInfos : List Command -> List CommandInfo
+collectCommandInfos commands =
+  commands |> concatMap (\command ->
+    case command of
+      Command info -> [info]
+      Group { children } -> children |> collectCommandInfos
+  )
+
+indexOf : Maybe CommandId -> List (Int, CommandInfo) -> Int 
+indexOf maybeCommandId commandInfosWithIndex =
+  case maybeCommandId of
+    Nothing -> 0
+    Just commandId ->
+      commandInfosWithIndex |> List.map (\indexed ->
+        if (indexed |> snd).id == commandId then Just (indexed |> fst) else Nothing
+      ) |> Maybe.oneOf |> withDefault 0
+
+findCommandIdByIndex : List (Int, CommandInfo) -> Int -> Maybe CommandId
+findCommandIdByIndex commandInfosWithIndex index =
+  commandInfosWithIndex |> List.map (\indexed ->
+    if (indexed |> fst) == index then Just (indexed |> snd).id else Nothing
+  ) |> Maybe.oneOf
 
 inputFieldId = "commandInput"
 
+findCommandInfo : Maybe CommandId -> List Command -> Maybe CommandInfo
+findCommandInfo maybeCommandId commands =
+  maybeCommandId `Maybe.andThen` (\commandId ->
+    commands |> List.map (\command ->
+      case command of
+        Command info -> if info.id == commandId then Just info else Nothing
+        Group { children } -> children |> findCommandInfo (Just commandId)
+    ) |> Maybe.oneOf
+  )
+
+safeHead : List a -> Maybe a
+safeHead list = if list |> List.isEmpty then Nothing else Just (list |> head)
+
 attributes : EditorState -> Node -> List Html.Attribute
 attributes editorState node =
-  let selected =
-        case editorState.selection of
-          Nothing -> False
-          Just selectedNode -> node == selectedNode
+  let selected = editorState.selection == Just node
       onKeyPress key =
         let editorCommand =
               if ((key |> String.length) == 1) && (editorState.inputText |> String.isEmpty) then
@@ -118,15 +164,23 @@ viewCommand command =
         attribute "label" text
       ] (children |> List.map viewCommand)
 
-viewCommandWithInput : Command -> Html
-viewCommandWithInput command =
+viewCommandWithInput : EditorState -> Command -> Html
+viewCommandWithInput editorState command =
   case command of
-    Command { text, message } ->
-      div [
-        onClick message
-      ] [Html.text text]
+    Command { id, text, message } ->
+      let selected = editorState.selectedCommandId == Just id
+      in
+        div [
+          onClick message,
+          classList [
+            ("command", True),
+            ("selected", selected)
+          ]
+        ] [Html.text text]
     Group { text, children } ->
-      div [] (children |> List.map viewCommandWithInput)
+      let caption = span [class "caption"] [text |> Html.text]
+          childrenView = children |> List.map (viewCommandWithInput editorState)
+      in div [class "group"] ([caption] ++ childrenView)
 
 viewRelationship : EditorState -> (Node, Relationship) -> Html
 viewRelationship editorState (originalNode, relationship) =
@@ -165,7 +219,8 @@ type EditorCommand =
   Type {
     input: String,
     first: Bool
-  }
+  } |
+  SelectCommand (Maybe CommandId)
 
 editorCommands : Channel EditorCommand
 editorCommands = channel Nop
@@ -178,13 +233,32 @@ updateEditorState editorCommand editorState =
   case editorCommand of
     Nop -> editorState
     Select newSelection -> { editorState | selection <- newSelection, inputText <- "" }
-    Type { input } -> { editorState | inputText <- input }
+    Type { input, first } ->
+      let newSelectedCommandId =
+            if first then
+              editorState.selection `Maybe.andThen` (\node -> input |> node.commandsWithInput |> firstCommandId)
+            else editorState.selectedCommandId
+      in
+        { editorState |
+          inputText <- input,
+          selectedCommandId <- newSelectedCommandId
+        }
+    SelectCommand newSelectedCommandId -> { editorState | selectedCommandId <- newSelectedCommandId }
+
+firstCommandId : List Command -> Maybe CommandId
+firstCommandId commands =
+  let getId command =
+        case command of
+          Command { id } -> Just id
+          Group { children } -> children |> firstCommandId
+  in (commands |> safeHead) `Maybe.andThen` getId
 
 initialEditorState : EditorState
 initialEditorState =
   {
     selection = Nothing,
-    inputText = ""
+    inputText = "",
+    selectedCommandId = Nothing
   }
 
 focusSignal : Signal String

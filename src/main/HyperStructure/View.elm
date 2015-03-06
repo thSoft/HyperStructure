@@ -121,12 +121,16 @@ viewKeyboardMenu editorState node =
   if (editorState.selection == Just node) && not (editorState.inputText |> String.isEmpty) then
     let allCommands = node |> getAllCommands editorState.inputText
         handleInput string = Type string |> send editorCommands
-        handleKeyUp keyCode =
+        handleKeyDown keyCode =
           case keyCode of
             27 -> Type "" |> send editorCommands
             40 -> SelectCommand (moveCommandSelectionBy editorState allCommands 1) |> send editorCommands
             38 -> SelectCommand (moveCommandSelectionBy editorState allCommands -1) |> send editorCommands
             13 -> allCommands |> findCommandInfo editorState.selectedCommandId |> Maybe.map .message |> withDefault (Nop |> send editorCommands) -- TODO also Type "" |> send editorCommands
+            _ -> Nop |> send editorCommands
+        handleKeyUp keyCode =
+          case keyCode of
+            13 -> Type "" |> send editorCommands
             _ -> Nop |> send editorCommands
         keyboardMenuItems = allCommands |> List.map (viewKeyboardMenuItem editorState)
     in
@@ -140,6 +144,7 @@ viewKeyboardMenu editorState node =
             Attr.value editorState.inputText,
             autofocus True, -- TODO polyfill
             on "input" targetValue handleInput,
+            onKeyDown handleKeyDown,
             onKeyUp handleKeyUp
           ] [],
           span [

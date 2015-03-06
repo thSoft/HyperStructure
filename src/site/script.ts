@@ -2,7 +2,7 @@
 
 interface Elm {
   Main: ElmModule<{
-    focus: PortFromElm<string>;
+    charCodes: PortToElm<number>;
   }>;
 }
 
@@ -11,18 +11,14 @@ interface JQueryStatic {
 }
 
 window.onload = () => {
-  var elm = Elm.embed(Elm.Main, document.getElementById('main'));
-  SvgConnectors.manage();
-  $.contextMenu("html5");
-  elm.ports.focus.subscribe((id) => {
-    setTimeout(() => { // XXX
-      var node = document.getElementById(id);
-      if (node != null) {
-        node.focus();
-        setCaretPosition(node, 1);
-      }
-    }, 50);
+  var elm = Elm.embed(Elm.Main, document.getElementById('main'), {
+    charCodes: 0
   });
+  SvgConnectors.manage();
+  $(document).bind("keypress", event => {
+    elm.ports.charCodes.send(event.charCode);
+  });
+  $.contextMenu("html5");
 }
 
 function setCaretPosition(ctrl, pos) {

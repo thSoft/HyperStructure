@@ -74,16 +74,19 @@ menu {
 }
 
 .commandsWithInput {
+  @border: 1px groove lightGray;
+  @padding: 2px 0.8em 2px 0.8em;
+
   position: absolute;
   left: 0;
   top: 110%;
   z-index: 1;
   background: #F6F6F6;
-  border: 1px ridge lightGray;
+  border: @border;
   border-radius: 4px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
   text-align: left;
-
+  
   input {
     width: 92%;
     min-width: 10em;
@@ -96,8 +99,6 @@ menu {
     color: white;
   }
 
-  @padding: 2px 0.8em 2px 0.8em;
-
   .command {
     color: black;
     padding: @padding;
@@ -105,7 +106,7 @@ menu {
 
   .group {
     color: darkGray;
-    border: 1px ridge lightGray;
+    border: @border;
     border-radius: 4px;
     margin: 1px 0.4em 1px 0.4em;
 

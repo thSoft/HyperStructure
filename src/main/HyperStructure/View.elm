@@ -1,4 +1,5 @@
 module HyperStructure.View where
+-- TODO split into modules
 
 import List (..)
 import List
@@ -17,6 +18,7 @@ import Signal
 import Json.Decode (..)
 import Json.Decode
 import Mouse
+import Keyboard
 import Char (..)
 import String (..)
 import String
@@ -43,27 +45,29 @@ viewChildren editorState node =
             NodeChild nodeChild -> nodeChild.node |> viewChildren editorState
         )
       menu = node |> viewMenu editorState
-      onInput string = Type { input = string, first = False } |> send editorCommands
+      onInput string = Type string |> send editorCommands
       commandsWithInput = editorState.inputText |> node.commandsWithInput
       onEnter = editorState.inputText |> node.commandsWithInput |> findCommandInfo editorState.selectedCommandId |> Maybe.map .message |> withDefault (Nop |> send editorCommands)
-      onKeyPress key =
-        case key of
-          "Esc" -> Type { input = "", first = False } |> send editorCommands
-          "Down" -> SelectCommand (moveCommandSelectionBy editorState commandsWithInput 1) |> send editorCommands
-          "Up" -> SelectCommand (moveCommandSelectionBy editorState commandsWithInput -1) |> send editorCommands
-          "Enter" -> onEnter
+      handleKeyPress keyCode =
+        case keyCode of
+          27 -> Type "" |> send editorCommands
+          40 -> SelectCommand (moveCommandSelectionBy editorState commandsWithInput 1) |> send editorCommands
+          38 -> SelectCommand (moveCommandSelectionBy editorState commandsWithInput -1) |> send editorCommands
+          13 -> onEnter
           _ -> Nop |> send editorCommands
       commandsWithInputView =
         if (editorState.selection == Just node) && not (editorState.inputText |> String.isEmpty) then
           [
-            div [
+            Html.node "dialog" [
+              attribute "open" "open",
               class "commandsWithInput",
-              on "keypress" ("key" := string) onKeyPress
+              onKeyUp handleKeyPress
             ] [
               input [
                 id inputFieldId,
                 Attr.value editorState.inputText,
-                on "input" targetValue onInput
+                on "input" targetValue onInput,
+                autofocus True
               ] [],
               span [
                 class "commands"
@@ -120,12 +124,6 @@ safeHead list = if list |> List.isEmpty then Nothing else Just (list |> head)
 attributes : EditorState -> Node -> List Html.Attribute
 attributes editorState node =
   let selected = editorState.selection == Just node
-      onKeyPress key =
-        let editorCommand =
-              if ((key |> String.length) == 1) && (editorState.inputText |> String.isEmpty) then
-                Type { input = key, first = True }
-              else Nop
-        in editorCommand |> send editorCommands
   in
     [
       id node.id,
@@ -133,9 +131,7 @@ attributes editorState node =
         ("children", True),
         ("selected", selected)
       ],
-      on "keypress" ("key" := string) onKeyPress,
       onClick (Select (Just node) |> send editorCommands),
-      tabindex 0,
       attribute "contextmenu" (node |> menuId)
     ]
 
@@ -216,33 +212,30 @@ insertAtMiddle toInsert original =
 type EditorCommand =
   Nop |
   Select (Maybe Node) |
-  Type {
-    input: String,
-    first: Bool
-  } |
+  KeyPress Char |
+  Type String |
   SelectCommand (Maybe CommandId)
 
-editorCommands : Channel EditorCommand
-editorCommands = channel Nop
-
-editorState : Signal EditorState
-editorState = foldp updateEditorState initialEditorState (editorCommands |> subscribe)
+editorState : Signal Int -> Signal EditorState
+editorState charCodes = foldp updateEditorState initialEditorState (allEditorCommands charCodes)
 
 updateEditorState : EditorCommand -> EditorState -> EditorState
 updateEditorState editorCommand editorState =
   case editorCommand of
     Nop -> editorState
     Select newSelection -> { editorState | selection <- newSelection, inputText <- "" }
-    Type { input, first } ->
-      let newSelectedCommandId =
-            if first then
-              editorState.selection `Maybe.andThen` (\node -> input |> node.commandsWithInput |> firstCommandId)
-            else editorState.selectedCommandId
-      in
-        { editorState |
-          inputText <- input,
-          selectedCommandId <- newSelectedCommandId
-        }
+    KeyPress char ->
+      if editorState.inputText |> String.isEmpty then
+        let newInputText = char |> fromChar
+            newSelectedCommandId =
+              editorState.selection `Maybe.andThen` (\selectedNode -> newInputText |> selectedNode.commandsWithInput |> firstCommandId)
+        in
+          { editorState |
+            inputText <- newInputText,
+            selectedCommandId <- newSelectedCommandId
+          }
+      else editorState
+    Type input -> { editorState | inputText <- input }
     SelectCommand newSelectedCommandId -> { editorState | selectedCommandId <- newSelectedCommandId }
 
 firstCommandId : List Command -> Maybe CommandId
@@ -261,13 +254,14 @@ initialEditorState =
     selectedCommandId = Nothing
   }
 
-focusSignal : Signal String
-focusSignal =
-  let toFocus editorCommand currentEditorState =
-        case editorCommand of
-          Type { input, first } ->
-            if first then inputFieldId
-            else if input |> String.isEmpty then currentEditorState.selection |> Maybe.map .id |> withDefault ""
-            else ""
-          _ -> ""
-  in Signal.map2 toFocus (editorCommands |> subscribe) editorState
+allEditorCommands : Signal Int -> Signal EditorCommand
+allEditorCommands charCodes = Signal.merge (editorCommands |> subscribe) (keyboardCommands charCodes)
+
+editorCommands : Channel EditorCommand
+editorCommands = channel Nop
+
+keyboardCommands : Signal Int -> Signal EditorCommand
+keyboardCommands charCodes =
+  charCodes |> Signal.map (\charCode ->
+    if (charCode >= 32) then KeyPress (charCode |> fromCode) else Nop
+  )

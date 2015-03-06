@@ -5,7 +5,6 @@ import Signal (..)
 import Signal
 import List (..)
 import List
-import Graphics.Collage (..)
 import Mouse
 import Html (..)
 import Html
@@ -15,22 +14,12 @@ import HyperStructure.Model (..)
 import HyperStructure.View (..)
 
 main : Signal Html
-main = Signal.map2 view editorState (constant node)
+main = Signal.map2 view (editorState charCodes) (constant node)
 
 view : EditorState -> Node -> Html
 view editorState node = node |> viewNode editorState
 
-port focus : Signal String
-port focus = focusSignal
-
-mainCommands : Channel MainCommand
-mainCommands = channel Nop
-
-type MainCommand =
-  Nop |
-  ShowValue |
-  Rename |
-  Replace
+port charCodes : Signal Int
 
 foo : Node
 foo =
@@ -66,7 +55,7 @@ foo =
       Group {
         text = "Replace with...",
         children =
-          methods |> List.filter (contains input) |> List.map (\method ->
+          methods |> List.filter (toLower >> contains (input |> toLower)) |> List.map (\method ->
             Command {
               id = ["Replace", method],
               text = method,
@@ -147,3 +136,12 @@ textNode id text =
     relationships = [],
     commands = [], commandsWithInput = always []
   }
+
+mainCommands : Channel MainCommand
+mainCommands = channel Nop
+
+type MainCommand =
+  Nop |
+  ShowValue |
+  Rename |
+  Replace

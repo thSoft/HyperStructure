@@ -12,6 +12,7 @@ import Html.Attributes (..)
 import Graphics.Input.Field (..)
 import HyperStructure.Model (..)
 import HyperStructure.View (..)
+import HyperStructure.Util (..)
 
 main : Signal Html
 main = Signal.map2 view (editorState charCodes) (constant node)
@@ -46,24 +47,26 @@ foo =
         ]
       }
     ],
-    commandsWithInput input = [
-      Command {
-        id = ["Rename"],
-        text = "Rename to " ++ input,
-        message = (Rename |> send mainCommands)
-      },
-      Group {
-        text = "Replace with...",
-        children =
-          methods |> List.filter (toLower >> contains (input |> toLower)) |> List.map (\method ->
-            Command {
-              id = ["Replace", method],
-              text = method,
-              message = (Replace |> send mainCommands)
-            }
-          )
-      }
-    ]
+    commandsWithInput input =
+      [
+        Command {
+          id = ["Rename"],
+          text = "Rename to " ++ input,
+          message = (Rename |> send mainCommands)
+        }
+      ] ++ ([
+        Group {
+          text = "Replace with",
+          children =
+            methods |> List.map (\method ->
+              Command {
+                id = ["Replace", method],
+                text = method,
+                message = (Replace |> send mainCommands)
+              }
+            )
+        }
+      ] |> filterCommands input)
   }
 
 methods = ["plus", "minus"]

@@ -23,65 +23,144 @@ import Char (..)
 import String (..)
 import String
 import HyperStructure.Model (..)
+import HyperStructure.Util (..)
 
 viewNode : EditorState -> Node -> Html
 viewNode editorState node =
-  let relatedNodes = node |> getAllRelationships |> List.map (viewRelationship editorState)
-  in
-    div [
-      class "node",
-      onClick (Select Nothing |> send editorCommands)
-    ] [
-      node |> viewChildren editorState,
-      div [class "relationships"] relatedNodes
-    ]
+  div [
+    class "node",
+    onClick (Select Nothing |> send editorCommands)
+  ] [
+    node |> viewChildren editorState,
+    node |> viewRelationships editorState
+  ]
 
 viewChildren : EditorState -> Node -> Html
 viewChildren editorState node =
-  let children =
+  let selected = editorState.selection == Just node
+      children =
         node.children |> List.map (\child ->
           case child of
             ContentChild { content } -> content
             NodeChild nodeChild -> nodeChild.node |> viewChildren editorState
         )
-      menu = node |> viewMenu editorState
-      onInput string = Type string |> send editorCommands
-      commandsWithInput = editorState.inputText |> node.commandsWithInput
-      onEnter = editorState.inputText |> node.commandsWithInput |> findCommandInfo editorState.selectedCommandId |> Maybe.map .message |> withDefault (Nop |> send editorCommands)
-      handleKeyPress keyCode =
-        case keyCode of
-          27 -> Type "" |> send editorCommands
-          40 -> SelectCommand (moveCommandSelectionBy editorState commandsWithInput 1) |> send editorCommands
-          38 -> SelectCommand (moveCommandSelectionBy editorState commandsWithInput -1) |> send editorCommands
-          13 -> onEnter
-          _ -> Nop |> send editorCommands
-      commandsWithInputView =
-        if (editorState.selection == Just node) && not (editorState.inputText |> String.isEmpty) then
-          [
-            Html.node "dialog" [
-              attribute "open" "open",
-              class "commandsWithInput",
-              onKeyUp handleKeyPress
-            ] [
-              input [
-                id inputFieldId,
-                Attr.value editorState.inputText,
-                on "input" targetValue onInput,
-                autofocus True
-              ] [],
-              span [
-                class "commands"
-              ] (commandsWithInput |> List.map (viewCommandWithInput editorState))
-            ]
+      contextMenu = node |> viewContextMenu editorState
+      keyboardMenu = node |> viewKeyboardMenu editorState
+  in
+    span [
+      id node.id,
+      classList [
+        ("children", True),
+        ("selected", selected)
+      ],
+      onClick (Select (Just node) |> send editorCommands),
+      attribute "contextmenu" (node |> menuId)
+    ] (children ++ contextMenu ++ keyboardMenu)
+
+viewRelationships : EditorState -> Node -> Html
+viewRelationships editorState node =
+  let relatedNodes = node |> getAllRelationships |> List.map (viewRelationship editorState)
+  in div [class "relationships"] relatedNodes
+
+getAllRelationships : Node -> List (Node, Relationship)
+getAllRelationships node =
+  let ownRelationships = node.relationships |> List.map ((,) node)
+      childRelationships =
+        node.children |> List.map (\child ->
+          case child of
+            ContentChild _ -> []
+            NodeChild { node } -> node |> getAllRelationships
+        )
+  in childRelationships |> insertAtMiddle [ownRelationships] |> List.concat
+
+viewRelationship : EditorState -> (Node, Relationship) -> Html
+viewRelationship editorState (originalNode, relationship) =
+  case relationship of 
+    Relationship { text, node } ->
+      span [] [
+        Svg.svg [] [
+          g [attribute "data-source" originalNode.id, attribute "data-target" node.id] [
+            line [SvgAttr.markerStart "url(#markerStart)", SvgAttr.markerEnd "url(#markerEnd)"] [],
+            Svg.text [SvgAttr.dominantBaseline "middle"] [text |> Html.text]
           ]
-        else []
-  in span (node |> attributes editorState) (children ++ menu ++ commandsWithInputView)
+        ],
+        node |> viewNode editorState
+      ]
+
+-- Context menu
+
+viewContextMenu : EditorState -> Node -> List Html
+viewContextMenu editorState node =
+  [
+    menu [
+      id (node |> menuId),
+      attribute "type" "context"
+    ] (node.commands |> List.map viewContextMenuItem)
+  ]
+
+menuId : Node -> String
+menuId node = node.id ++ "menu"
+
+viewContextMenuItem : Command -> Html
+viewContextMenuItem command =
+  case command of
+    Command { text, message } ->
+      menuitem [
+        onClick message,
+        attribute "label" text
+      ] []
+    Group { text, children } ->
+      menu [
+        attribute "label" text
+      ] (children |> List.map viewContextMenuItem)
+
+-- Keyboard menu
+
+viewKeyboardMenu : EditorState -> Node -> List Html
+viewKeyboardMenu editorState node =
+  if (editorState.selection == Just node) && not (editorState.inputText |> String.isEmpty) then
+    let allCommands = node |> getAllCommands editorState.inputText
+        handleInput string = Type string |> send editorCommands
+        handleKeyUp keyCode =
+          case keyCode of
+            27 -> Type "" |> send editorCommands
+            40 -> SelectCommand (moveCommandSelectionBy editorState allCommands 1) |> send editorCommands
+            38 -> SelectCommand (moveCommandSelectionBy editorState allCommands -1) |> send editorCommands
+            13 -> allCommands |> findCommandInfo editorState.selectedCommandId |> Maybe.map .message |> withDefault (Nop |> send editorCommands) -- TODO also Type "" |> send editorCommands
+            _ -> Nop |> send editorCommands
+        keyboardMenuItems = allCommands |> List.map (viewKeyboardMenuItem editorState)
+    in
+      [
+        Html.node "dialog" [
+          attribute "open" "open",
+          class "commandsWithInput"
+        ] [
+          input [
+            id inputFieldId,
+            Attr.value editorState.inputText,
+            autofocus True, -- TODO polyfill
+            on "input" targetValue handleInput,
+            onKeyUp handleKeyUp
+          ] [],
+          span [
+            class "commands"
+          ] keyboardMenuItems
+        ]
+      ]
+  else []
+
+getAllCommands : String -> Node -> List Command
+getAllCommands inputText node =
+  let commandsWithInput = inputText |> node.commandsWithInput
+      filteredCommands = node.commands |> filterCommands inputText
+  in commandsWithInput ++ filteredCommands
 
 moveCommandSelectionBy : EditorState -> List Command -> Int -> Maybe CommandId
 moveCommandSelectionBy editorState commandsWithInput offset =
   let commandInfosWithIndex = commandsWithInput |> collectCommandInfos |> indexedMap (,)
-      stepIndex index = (index + offset) % (commandInfosWithIndex |> List.length)
-  in commandInfosWithIndex |> indexOf editorState.selectedCommandId |> stepIndex |> findCommandIdByIndex commandInfosWithIndex
+      index = commandInfosWithIndex |> indexOf editorState.selectedCommandId
+      newIndex = (index + offset) % (commandInfosWithIndex |> List.length)
+  in commandInfosWithIndex |> findCommandIdByIndex newIndex
 
 collectCommandInfos : List Command -> List CommandInfo
 collectCommandInfos commands =
@@ -100,8 +179,8 @@ indexOf maybeCommandId commandInfosWithIndex =
         if (indexed |> snd).id == commandId then Just (indexed |> fst) else Nothing
       ) |> Maybe.oneOf |> withDefault 0
 
-findCommandIdByIndex : List (Int, CommandInfo) -> Int -> Maybe CommandId
-findCommandIdByIndex commandInfosWithIndex index =
+findCommandIdByIndex : Int -> List (Int, CommandInfo) -> Maybe CommandId
+findCommandIdByIndex index commandInfosWithIndex =
   commandInfosWithIndex |> List.map (\indexed ->
     if (indexed |> fst) == index then Just (indexed |> snd).id else Nothing
   ) |> Maybe.oneOf
@@ -118,50 +197,19 @@ findCommandInfo maybeCommandId commands =
     ) |> Maybe.oneOf
   )
 
-safeHead : List a -> Maybe a
-safeHead list = if list |> List.isEmpty then Nothing else Just (list |> head)
+filterCommands : String -> List Command -> List Command
+filterCommands searchTerm commands =
+  commands |> concatMap (\command ->
+    case command of
+      Command { text } -> if text `containsIgnoreCase` searchTerm then [command] else [] -- TODO fuzzy contains
+      Group { text, children } -> 
+        let filteredChildren = children |> filterCommands searchTerm
+        in
+          if filteredChildren |> List.isEmpty then [] else [Group { text = text, children = filteredChildren }]
+  )
 
-attributes : EditorState -> Node -> List Html.Attribute
-attributes editorState node =
-  let selected = editorState.selection == Just node
-  in
-    [
-      id node.id,
-      classList [
-        ("children", True),
-        ("selected", selected)
-      ],
-      onClick (Select (Just node) |> send editorCommands),
-      attribute "contextmenu" (node |> menuId)
-    ]
-
-viewMenu : EditorState -> Node -> List Html
-viewMenu editorState node =
-  [
-    menu [
-      id (node |> menuId),
-      attribute "type" "context"
-    ] (node.commands |> List.map viewCommand)
-  ]
-
-menuId : Node -> String
-menuId node = node.id ++ "menu"
-
-viewCommand : Command -> Html
-viewCommand command =
-  case command of
-    Command { text, message } ->
-      menuitem [
-        onClick message,
-        attribute "label" text
-      ] []
-    Group { text, children } ->
-      menu [
-        attribute "label" text
-      ] (children |> List.map viewCommand)
-
-viewCommandWithInput : EditorState -> Command -> Html
-viewCommandWithInput editorState command =
+viewKeyboardMenuItem : EditorState -> Command -> Html
+viewKeyboardMenuItem editorState command =
   case command of
     Command { id, text, message } ->
       let selected = editorState.selectedCommandId == Just id
@@ -175,39 +223,10 @@ viewCommandWithInput editorState command =
         ] [Html.text text]
     Group { text, children } ->
       let caption = span [class "caption"] [text |> Html.text]
-          childrenView = children |> List.map (viewCommandWithInput editorState)
+          childrenView = children |> List.map (viewKeyboardMenuItem editorState)
       in div [class "group"] ([caption] ++ childrenView)
 
-viewRelationship : EditorState -> (Node, Relationship) -> Html
-viewRelationship editorState (originalNode, relationship) =
-  case relationship of 
-    Relationship { text, node } ->
-      span [] [
-        Svg.svg [] [
-          g [attribute "data-source" originalNode.id, attribute "data-target" node.id] [
-            line [SvgAttr.markerStart "url(#markerStart)", SvgAttr.markerEnd "url(#markerEnd)"] [],
-            Svg.text [SvgAttr.dominantBaseline "middle"] [text |> Html.text]
-          ]
-        ],
-        node |> viewNode editorState
-      ]
-
-getAllRelationships : Node -> List (Node, Relationship)
-getAllRelationships node =
-  let ownRelationships = node.relationships |> List.map ((,) node)
-      childRelationships = node.children |> List.map getChildRelationships
-      getChildRelationships child =
-        case child of
-          ContentChild _ -> []
-          NodeChild { node } -> node |> getAllRelationships
-  in childRelationships |> insertAtMiddle [ownRelationships] |> List.concat
-
-insertAtMiddle : List a -> List a -> List a
-insertAtMiddle toInsert original =
-  let half = (original |> List.length) // 2
-      firstHalf = original |> take half
-      secondHalf = original |> drop half
-  in [firstHalf, toInsert, secondHalf] |> List.concat
+-- Editor state
 
 type EditorCommand =
   Nop |
@@ -227,24 +246,17 @@ updateEditorState editorCommand editorState =
     KeyPress char ->
       if editorState.inputText |> String.isEmpty then
         let newInputText = char |> fromChar
-            newSelectedCommandId =
-              editorState.selection `Maybe.andThen` (\selectedNode -> newInputText |> selectedNode.commandsWithInput |> firstCommandId)
         in
           { editorState |
             inputText <- newInputText,
-            selectedCommandId <- newSelectedCommandId
+            selectedCommandId <- editorState.selection `Maybe.andThen` (\selectedNode -> selectedNode |> getAllCommands newInputText |> firstCommandId)
           }
       else editorState
     Type input -> { editorState | inputText <- input }
     SelectCommand newSelectedCommandId -> { editorState | selectedCommandId <- newSelectedCommandId }
 
 firstCommandId : List Command -> Maybe CommandId
-firstCommandId commands =
-  let getId command =
-        case command of
-          Command { id } -> Just id
-          Group { children } -> children |> firstCommandId
-  in (commands |> safeHead) `Maybe.andThen` getId
+firstCommandId commands = commands |> collectCommandInfos |> indexedMap (,) |> findCommandIdByIndex 0
 
 initialEditorState : EditorState
 initialEditorState =

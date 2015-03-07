@@ -140,9 +140,9 @@ viewKeyboardMenu editorState node =
           class "commandsWithInput"
         ] [
           input [
-            id inputFieldId,
+            id "commandInput",
             Attr.value editorState.inputText,
-            autofocus True, -- TODO polyfill
+            autofocus True,
             on "input" targetValue handleInput,
             onKeyDown handleKeyDown,
             onKeyUp handleKeyUp
@@ -190,8 +190,6 @@ findCommandIdByIndex index commandInfosWithIndex =
     if (indexed |> fst) == index then Just (indexed |> snd).id else Nothing
   ) |> Maybe.oneOf
 
-inputFieldId = "commandInput"
-
 findCommandInfo : Maybe CommandId -> List Command -> Maybe CommandInfo
 findCommandInfo maybeCommandId commands =
   maybeCommandId `Maybe.andThen` (\commandId ->
@@ -209,8 +207,7 @@ filterCommands searchTerm commands =
       Command { text } -> if text `containsIgnoreCase` searchTerm then [command] else [] -- TODO fuzzy contains
       Group { text, children } -> 
         let filteredChildren = children |> filterCommands searchTerm
-        in
-          if filteredChildren |> List.isEmpty then [] else [Group { text = text, children = filteredChildren }]
+        in if filteredChildren |> List.isEmpty then [] else [Group { text = text, children = filteredChildren }]
   )
 
 viewKeyboardMenuItem : EditorState -> Command -> Html

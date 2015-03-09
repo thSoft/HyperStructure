@@ -29,7 +29,7 @@ viewNode : EditorState -> Node -> Html
 viewNode editorState node =
   div [
     class "node",
-    onClick (Select Nothing |> send editorCommands)
+    onClick (Select Nothing |> send editorCommandChannel)
   ] [
     node |> viewChildren editorState,
     node |> viewRelationships editorState
@@ -53,7 +53,7 @@ viewChildren editorState node =
         ("children", True),
         ("selected", selected)
       ],
-      onClick (Select (Just node) |> send editorCommands),
+      onClick (Select (Just node) |> send editorCommandChannel),
       attribute "contextmenu" (node |> menuId)
     ] (children ++ contextMenu ++ keyboardMenu)
 
@@ -120,24 +120,24 @@ viewKeyboardMenu : EditorState -> Node -> List Html
 viewKeyboardMenu editorState node =
   if (editorState.selection == Just node) && not (editorState.inputText |> String.isEmpty) then
     let allCommands = node |> getAllCommands editorState.inputText
-        handleInput string = Type string |> send editorCommands
+        handleInput string = Type string |> send editorCommandChannel
         handleKeyDown keyCode =
           case keyCode of
-            27 -> Type "" |> send editorCommands
-            40 -> SelectCommand (moveCommandSelectionBy editorState allCommands 1) |> send editorCommands
-            38 -> SelectCommand (moveCommandSelectionBy editorState allCommands -1) |> send editorCommands
-            13 -> allCommands |> findCommandInfo editorState.selectedCommandId |> Maybe.map .message |> withDefault (Nop |> send editorCommands) -- TODO also Type "" |> send editorCommands
-            _ -> Nop |> send editorCommands
+            27 -> Type "" |> send editorCommandChannel
+            40 -> SelectCommand (moveCommandSelectionBy editorState allCommands 1) |> send editorCommandChannel
+            38 -> SelectCommand (moveCommandSelectionBy editorState allCommands -1) |> send editorCommandChannel
+            13 -> allCommands |> findCommandInfo editorState.selectedCommandId |> Maybe.map .message |> withDefault (Nop |> send editorCommandChannel) -- TODO also Type "" |> send editorCommandChannel
+            _ -> Nop |> send editorCommandChannel
         handleKeyUp keyCode =
           case keyCode of
-            13 -> Type "" |> send editorCommands
-            _ -> Nop |> send editorCommands
+            13 -> Type "" |> send editorCommandChannel
+            _ -> Nop |> send editorCommandChannel
         keyboardMenuItems = allCommands |> List.map (viewKeyboardMenuItem editorState)
     in
       [
         Html.node "dialog" [
           attribute "open" "open",
-          class "commandsWithInput"
+          class "keyboardMenu"
         ] [
           input [
             id "commandInput",
@@ -222,7 +222,7 @@ viewKeyboardMenuItem editorState command =
             ("command", True),
             ("selected", selected)
           ]
-        ] [Html.text text]
+        ] [text |> Html.text]
     Group { text, children } ->
       let caption = span [class "caption"] [text |> Html.text]
           childrenView = children |> List.map (viewKeyboardMenuItem editorState)
@@ -238,7 +238,7 @@ type EditorCommand =
   SelectCommand (Maybe CommandId)
 
 editorState : Signal Int -> Signal EditorState
-editorState charCodes = foldp updateEditorState initialEditorState (allEditorCommands charCodes)
+editorState charCodes = foldp updateEditorState initialEditorState (editorCommands charCodes)
 
 updateEditorState : EditorCommand -> EditorState -> EditorState
 updateEditorState editorCommand editorState =
@@ -268,11 +268,11 @@ initialEditorState =
     selectedCommandId = Nothing
   }
 
-allEditorCommands : Signal Int -> Signal EditorCommand
-allEditorCommands charCodes = Signal.merge (editorCommands |> subscribe) (keyboardCommands charCodes)
+editorCommands : Signal Int -> Signal EditorCommand
+editorCommands charCodes = Signal.mergeMany [(editorCommandChannel |> subscribe), (keyboardCommands charCodes)]
 
-editorCommands : Channel EditorCommand
-editorCommands = channel Nop
+editorCommandChannel : Channel EditorCommand
+editorCommandChannel = channel Nop
 
 keyboardCommands : Signal Int -> Signal EditorCommand
 keyboardCommands charCodes =

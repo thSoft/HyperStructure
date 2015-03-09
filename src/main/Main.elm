@@ -51,7 +51,7 @@ foo =
       [
         Command {
           id = ["Rename"],
-          text = "Rename to " ++ input,
+          text = "Rename to: " ++ input,
           message = (Rename |> send mainCommands)
         }
       ] ++ ([

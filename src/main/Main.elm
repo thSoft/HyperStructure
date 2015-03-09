@@ -1,75 +1,25 @@
 module Main where
 
-import String (..)
 import Signal (..)
 import Signal
 import List (..)
 import List
-import Mouse
 import Html (..)
 import Html
 import Html.Attributes (..)
-import Graphics.Input.Field (..)
 import HyperStructure.Model (..)
 import HyperStructure.View (..)
-import HyperStructure.Util (..)
 
 main : Signal Html
-main = Signal.map2 view (editorState charCodes) (constant node)
+main = Signal.map2 view (editorState charCodes) model
 
 view : EditorState -> Node -> Html
 view editorState node = node |> viewNode editorState
 
 port charCodes : Signal Int
 
-foo : Node
-foo =
-  {
-    id = "foo",
-    children = [
-      ContentChild { content = "foo" |> text }
-    ],
-    relationships = [
-      Relationship {
-        text = "value",
-        node = "42" |> textNode "value of foo"
-      }
-    ],
-    commands = [
-      Group {
-        text = "Show",
-        children = [
-          Command {
-            id = ["Show", "Value"],
-            text = "Value",
-            message = (ShowValue |> send mainCommands)
-          }
-        ]
-      }
-    ],
-    commandsWithInput input =
-      [
-        Command {
-          id = ["Rename"],
-          text = "Rename to: " ++ input,
-          message = (Rename |> send mainCommands)
-        }
-      ] ++ ([
-        Group {
-          text = "Replace with",
-          children =
-            methods |> List.map (\method ->
-              Command {
-                id = ["Replace", method],
-                text = method,
-                message = (Replace |> send mainCommands)
-              }
-            )
-        }
-      ] |> filterCommands input)
-  }
-
-methods = ["plus", "minus"]
+model : Signal Node
+model = constant node
 
 node : Node
 node =
@@ -129,6 +79,55 @@ node =
     commands = [], commandsWithInput = always []
   }
 
+foo : Node
+foo =
+  {
+    id = "foo",
+    children = [
+      ContentChild { content = "foo" |> text }
+    ],
+    relationships = [
+      Relationship {
+        text = "value",
+        node = "42" |> textNode "value of foo"
+      }
+    ],
+    commands = [
+      Group {
+        text = "Show",
+        children = [
+          Command {
+            id = ["Show", "Value"],
+            text = "Value",
+            message = (ShowValue |> send mainCommandChannel)
+          }
+        ]
+      }
+    ],
+    commandsWithInput input =
+      [
+        Command {
+          id = ["Rename"],
+          text = "Rename to: " ++ input,
+          message = (Rename |> send mainCommandChannel)
+        }
+      ] ++ ([
+        Group {
+          text = "Replace with",
+          children =
+            methods |> List.map (\method ->
+              Command {
+                id = ["Replace", method],
+                text = method,
+                message = (Replace |> send mainCommandChannel)
+              }
+            )
+        }
+      ] |> filterCommands input)
+  }
+
+methods = ["plus", "minus"]
+
 textNode : String -> String -> Node
 textNode id text =
   {
@@ -140,8 +139,8 @@ textNode id text =
     commands = [], commandsWithInput = always []
   }
 
-mainCommands : Channel MainCommand
-mainCommands = channel Nop
+mainCommandChannel : Channel MainCommand
+mainCommandChannel = channel Nop
 
 type MainCommand =
   Nop |

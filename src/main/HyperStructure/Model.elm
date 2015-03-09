@@ -26,10 +26,7 @@ type Relationship = Relationship {
 
 type Command =
   Command CommandInfo |
-  Group {
-    text: String,
-    children: List Command
-  }
+  Group GroupInfo
 
 type alias CommandInfo = {
   id: CommandId,
@@ -38,6 +35,11 @@ type alias CommandInfo = {
 }
 
 type alias CommandId = List String
+
+type alias GroupInfo = {
+  text: String,
+  children: List Command
+}
 
 type alias EditorState = {
   selection: Selection,

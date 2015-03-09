@@ -233,6 +233,8 @@ viewKeyboardMenuItem editorState command =
 type EditorCommand =
   Nop |
   Select (Maybe Node) |
+  SelectFirstRelatedNode |
+  SelectFirstChild |
   KeyPress Char |
   Type String |
   SelectCommand (Maybe CommandId)
@@ -245,6 +247,16 @@ updateEditorState editorCommand editorState =
   case editorCommand of
     Nop -> editorState
     Select newSelection -> { editorState | selection <- newSelection, inputText <- "" }
+    SelectFirstRelatedNode ->
+      editorState |> selectFirst .relationships (\relationship ->
+        case relationship of
+          Relationship { node } -> node
+      )
+    SelectFirstChild ->
+      editorState |> selectFirst (.children >> List.filter isNodeChild) (\child ->
+        case child of
+          NodeChild { node } -> node
+      )
     KeyPress char ->
       if editorState.inputText |> String.isEmpty then
         let newInputText = char |> fromChar
@@ -256,6 +268,25 @@ updateEditorState editorCommand editorState =
       else editorState
     Type input -> { editorState | inputText <- input }
     SelectCommand newSelectedCommandId -> { editorState | selectedCommandId <- newSelectedCommandId }
+
+isNodeChild : Child -> Bool
+isNodeChild child =
+  case child of
+    NodeChild _ -> True
+    _ -> False
+
+selectFirst : (Node -> List a) -> (a -> Node) -> EditorState -> EditorState
+selectFirst getTargets getNode editorState =
+  if editorState.inputText |> String.isEmpty then
+    let newSelection =
+          editorState.selection |> Maybe.map (\selectedNode ->
+            let targets = selectedNode |> getTargets
+            in
+              if targets |> List.isEmpty then selectedNode
+              else targets |> head |> getNode
+          )
+    in { editorState | selection <- newSelection }
+  else editorState
 
 firstCommandId : List Command -> Maybe CommandId
 firstCommandId commands = commands |> collectCommandInfos |> indexedMap (,) |> findCommandIdByIndex 0
@@ -269,13 +300,23 @@ initialEditorState =
   }
 
 editorCommands : Signal Int -> Signal EditorCommand
-editorCommands charCodes = Signal.mergeMany [(editorCommandChannel |> subscribe), (keyboardCommands charCodes)]
+editorCommands charCodes =
+  Signal.mergeMany [editorCommandChannel |> subscribe, printingCharacterCommands charCodes, controlCharacterCommands]
 
 editorCommandChannel : Channel EditorCommand
 editorCommandChannel = channel Nop
 
-keyboardCommands : Signal Int -> Signal EditorCommand
-keyboardCommands charCodes =
+printingCharacterCommands : Signal Int -> Signal EditorCommand
+printingCharacterCommands charCodes =
   charCodes |> Signal.map (\charCode ->
     if (charCode >= 32) then KeyPress (charCode |> fromCode) else Nop
+  )
+
+controlCharacterCommands : Signal EditorCommand
+controlCharacterCommands =
+  Keyboard.lastPressed |> Signal.map (\keyCode ->
+    case keyCode of
+      9 -> SelectFirstRelatedNode
+      13 -> SelectFirstChild
+      _ -> Nop
   )

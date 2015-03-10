@@ -14,9 +14,6 @@ insertAtMiddle toInsert original =
 containsIgnoreCase : String -> String -> Bool
 containsIgnoreCase haystack needle = haystack |> toLower |> contains (needle |> toLower)
 
-safeHead : List a -> Maybe a
-safeHead list = if list |> List.isEmpty then Nothing else Just (list |> head)
-
 isJust : Maybe a -> Bool
 isJust maybe =
   case maybe of

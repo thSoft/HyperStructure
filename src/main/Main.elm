@@ -2,19 +2,15 @@ module Main where
 
 import Signal (..)
 import Signal
-import List (..)
 import List
 import Html (..)
 import Html
-import Html.Attributes (..)
 import HyperStructure.Model (..)
+import HyperStructure.EditorState (..)
 import HyperStructure.View (..)
 
 main : Signal Html
-main = Signal.map2 view (editorState charCodes model) model
-
-view : EditorState -> Node -> Html
-view editorState node = node |> viewNode editorState
+main = Signal.map2 viewNode (editorState charCodes model) model
 
 port charCodes : Signal Int
 
@@ -41,7 +37,8 @@ node =
                   ContentChild { content = "2" |> text }
                 ],
                 relationships = [],
-                commands = [], commandsWithInput = always []
+                commands = [],
+                commandsWithInput = always []
               }
             },
             ContentChild { content = "*" |> text },
@@ -57,12 +54,14 @@ node =
                     node = "1" |> textNode "value of bar"
                   }
                 ],
-                commands = [], commandsWithInput = always []
+                commands = [],
+                commandsWithInput = always []
               }
             }
           ],
           relationships = [],
-          commands = [], commandsWithInput = always []
+          commands = [],
+          commandsWithInput = always []
         }
       }
     ],
@@ -80,11 +79,13 @@ node =
             NodeChild { node = "(real)" |> textNode "real" }
           ],
           relationships = [],
-          commands = [], commandsWithInput = always []
+          commands = [],
+          commandsWithInput = always []
         }
       }
     ],
-    commands = [], commandsWithInput = always []
+    commands = [],
+    commandsWithInput = always []
   }
 
 foo : Node
@@ -123,10 +124,10 @@ foo =
         Group {
           text = "Replace with",
           children =
-            methods |> List.map (\method ->
+            functions |> List.map (\function ->
               Command {
-                id = ["Replace", method],
-                text = method,
+                id = ["Replace", function],
+                text = function,
                 message = (Replace |> send mainCommandChannel)
               }
             )
@@ -134,7 +135,7 @@ foo =
       ] |> filterCommands input)
   }
 
-methods = ["plus", "minus"]
+functions = ["+", "-", "*", "/"]
 
 textNode : String -> String -> Node
 textNode id text =
@@ -144,7 +145,8 @@ textNode id text =
       ContentChild { content = text |> Html.text }
     ],
     relationships = [],
-    commands = [], commandsWithInput = always []
+    commands = [],
+    commandsWithInput = always []
   }
 
 mainCommandChannel : Channel MainCommand

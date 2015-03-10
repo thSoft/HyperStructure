@@ -47,7 +47,7 @@ viewChildren editorState node =
         ("selected", selected)
       ],
       onClick (EditorState.select (Just node) |> send editorCommandChannel),
-      attribute "contextmenu" (node |> menuId)
+      attribute "contextmenu" (node |> contextMenuId)
     ] (children ++ contextMenu ++ keyboardMenu)
 
 viewRelationships : EditorState -> Node -> Html
@@ -84,13 +84,13 @@ viewContextMenu : EditorState -> Node -> List Html
 viewContextMenu editorState node =
   [
     menu [
-      id (node |> menuId),
+      id (node |> contextMenuId),
       attribute "type" "context"
     ] (node.commands |> List.map viewContextMenuItem)
   ]
 
-menuId : Node -> String
-menuId node = "menu of " ++ node.id
+contextMenuId : Node -> String
+contextMenuId node = node.id ++ "ContextMenu"
 
 viewContextMenuItem : Command -> Html
 viewContextMenuItem command =

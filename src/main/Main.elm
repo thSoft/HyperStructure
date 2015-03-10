@@ -20,7 +20,7 @@ model = constant node
 node : Node
 node =
   {
-    id = "main expression",
+    id = "mainExpression",
     children = [
       NodeChild {
         node = foo
@@ -51,7 +51,7 @@ node =
                 relationships = [
                   Relationship {
                     text = "value",
-                    node = "1" |> textNode "value of bar"
+                    node = "1" |> textNode "barValue"
                   }
                 ],
                 commands = [],
@@ -68,12 +68,12 @@ node =
     relationships = [
       Relationship {
         text = "value",
-        node = "44" |> textNode "value of main expression"
+        node = "44" |> textNode "mainExpressionValue"
       },
       Relationship {
         text = "type",
         node = {
-          id = "type of main expression",
+          id = "mainExpressionType",
           children = [
             ContentChild { content = "number" |> Html.text },
             NodeChild { node = "(real)" |> textNode "real" }
@@ -98,7 +98,7 @@ foo =
     relationships = [
       Relationship {
         text = "value",
-        node = "42" |> textNode "value of foo"
+        node = "42" |> textNode "fooValue"
       }
     ],
     commands = [

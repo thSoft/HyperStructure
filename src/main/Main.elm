@@ -11,7 +11,7 @@ import HyperStructure.Model (..)
 import HyperStructure.View (..)
 
 main : Signal Html
-main = Signal.map2 view (editorState charCodes) model
+main = Signal.map2 view (editorState charCodes model) model
 
 view : EditorState -> Node -> Html
 view editorState node = node |> viewNode editorState
@@ -73,7 +73,15 @@ node =
       },
       Relationship {
         text = "type",
-        node = "number" |> textNode "type of main expression"
+        node = {
+          id = "type of main expression",
+          children = [
+            ContentChild { content = "number" |> Html.text },
+            NodeChild { node = "(real)" |> textNode "real" }
+          ],
+          relationships = [],
+          commands = [], commandsWithInput = always []
+        }
       }
     ],
     commands = [], commandsWithInput = always []

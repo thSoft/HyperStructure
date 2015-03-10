@@ -16,3 +16,9 @@ containsIgnoreCase haystack needle = haystack |> toLower |> contains (needle |> 
 
 safeHead : List a -> Maybe a
 safeHead list = if list |> List.isEmpty then Nothing else Just (list |> head)
+
+isJust : Maybe a -> Bool
+isJust maybe =
+  case maybe of
+    Just _ -> True
+    _ -> False

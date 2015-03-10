@@ -1,6 +1,9 @@
 module HyperStructure.View where
 -- TODO split into modules
 
+import Basics
+import Array (..)
+import Array
 import List (..)
 import List
 import Maybe (..)
@@ -123,13 +126,13 @@ viewKeyboardMenu editorState node =
         handleInput string = Type string |> send editorCommandChannel
         handleKeyDown keyCode =
           case keyCode of
-            27 -> Type "" |> send editorCommandChannel
             40 -> SelectCommand (moveCommandSelectionBy editorState allCommands 1) |> send editorCommandChannel
             38 -> SelectCommand (moveCommandSelectionBy editorState allCommands -1) |> send editorCommandChannel
             13 -> allCommands |> findCommandInfo editorState.selectedCommandId |> Maybe.map .message |> withDefault (Nop |> send editorCommandChannel) -- TODO also Type "" |> send editorCommandChannel
             _ -> Nop |> send editorCommandChannel
         handleKeyUp keyCode =
           case keyCode of
+            27 -> Type "" |> send editorCommandChannel
             13 -> Type "" |> send editorCommandChannel
             _ -> Nop |> send editorCommandChannel
         keyboardMenuItems = allCommands |> List.map (viewKeyboardMenuItem editorState)
@@ -162,8 +165,8 @@ getAllCommands inputText node =
 
 moveCommandSelectionBy : EditorState -> List Command -> Int -> Maybe CommandId
 moveCommandSelectionBy editorState commandsWithInput offset =
-  let commandInfosWithIndex = commandsWithInput |> collectCommandInfos |> indexedMap (,)
-      index = commandInfosWithIndex |> indexOf editorState.selectedCommandId
+  let commandInfosWithIndex = commandsWithInput |> collectCommandInfos |> List.indexedMap (,)
+      index = commandInfosWithIndex |> indexOfCommandId editorState.selectedCommandId
       newIndex = (index + offset) % (commandInfosWithIndex |> List.length)
   in commandInfosWithIndex |> findCommandIdByIndex newIndex
 
@@ -175,8 +178,8 @@ collectCommandInfos commands =
       Group { children } -> children |> collectCommandInfos
   )
 
-indexOf : Maybe CommandId -> List (Int, CommandInfo) -> Int 
-indexOf maybeCommandId commandInfosWithIndex =
+indexOfCommandId : Maybe CommandId -> List (Int, CommandInfo) -> Int 
+indexOfCommandId maybeCommandId commandInfosWithIndex =
   case maybeCommandId of
     Nothing -> 0
     Just commandId ->
@@ -235,28 +238,37 @@ type EditorCommand =
   Select (Maybe Node) |
   SelectFirstRelatedNode |
   SelectFirstChild |
+  SelectParent |
+  SelectNext |
+  SelectPrevious |
   KeyPress Char |
   Type String |
   SelectCommand (Maybe CommandId)
 
-editorState : Signal Int -> Signal EditorState
-editorState charCodes = foldp updateEditorState initialEditorState (editorCommands charCodes)
+editorState : Signal Int -> Signal Node -> Signal EditorState
+editorState charCodes modelRoots =
+  let updates = Signal.map2 (,) (editorCommands charCodes) modelRoots
+  in foldp updateEditorState initialEditorState updates
 
-updateEditorState : EditorCommand -> EditorState -> EditorState
-updateEditorState editorCommand editorState =
+updateEditorState : (EditorCommand, Node) -> EditorState -> EditorState
+updateEditorState (editorCommand, modelRoot) editorState =
   case editorCommand of
     Nop -> editorState
     Select newSelection -> { editorState | selection <- newSelection, inputText <- "" }
     SelectFirstRelatedNode ->
-      editorState |> selectFirst .relationships (\relationship ->
-        case relationship of
-          Relationship { node } -> node
-      )
+      if editorState.selection |> isJust then editorState |> select editorState.selection 0 .relationships getRelationshipNode
+      else { editorState | selection <- Just modelRoot }
     SelectFirstChild ->
-      editorState |> selectFirst (.children >> List.filter isNodeChild) (\child ->
-        case child of
-          NodeChild { node } -> node
-      )
+      if editorState.selection |> isJust then editorState |> select editorState.selection 0 nodeChildren getChildNode
+      else { editorState | selection <- Just modelRoot }
+    SelectParent ->
+      if editorState.inputText |> String.isEmpty then
+        case editorState.selection of
+          Just selectedNode -> { editorState | selection <- selectedNode |> findParent modelRoot }
+          Nothing -> editorState
+      else editorState
+    SelectNext -> editorState |> moveSelectionBy 1 modelRoot
+    SelectPrevious -> editorState |> moveSelectionBy -1 modelRoot
     KeyPress char ->
       if editorState.inputText |> String.isEmpty then
         let newInputText = char |> fromChar
@@ -269,27 +281,79 @@ updateEditorState editorCommand editorState =
     Type input -> { editorState | inputText <- input }
     SelectCommand newSelectedCommandId -> { editorState | selectedCommandId <- newSelectedCommandId }
 
-isNodeChild : Child -> Bool
-isNodeChild child =
-  case child of
-    NodeChild _ -> True
-    _ -> False
+findParent : Node -> Node -> Maybe Node -- TODO optimize with zippers?
+findParent potentialParent selectedNode =
+  let found =
+        potentialParent.children |> List.any (\child ->
+          case child of
+            NodeChild { node } -> node == selectedNode
+            _ -> False
+        )
+  in
+    if found then Just potentialParent
+    else
+      let childResults =
+            potentialParent.children |> List.map (\child ->
+              case child of
+                NodeChild { node } -> selectedNode |> findParent node
+                _ -> Nothing
+            )
+          relationshipResults =
+            potentialParent.relationships |> List.map (\relationship ->
+              case relationship of
+                Relationship { node } -> selectedNode |> findParent node
+            )
+      in (childResults ++ relationshipResults) |> Maybe.oneOf
 
-selectFirst : (Node -> List a) -> (a -> Node) -> EditorState -> EditorState
-selectFirst getTargets getNode editorState =
+nodeChildren : Node -> List Child
+nodeChildren node =
+  node.children |> List.filter (\child ->
+    case child of
+      NodeChild _ -> True
+      _ -> False
+  )
+
+getRelationshipNode : Relationship -> Node
+getRelationshipNode relationship = case relationship of Relationship { node } -> node
+
+getChildNode : Child -> Node
+getChildNode child = case child of NodeChild { node } -> node
+
+select : Maybe Node -> Int -> (Node -> List a) -> (a -> Node) -> EditorState -> EditorState
+select maybeParent index getTargets getNode editorState =
   if editorState.inputText |> String.isEmpty then
     let newSelection =
-          editorState.selection |> Maybe.map (\selectedNode ->
+          maybeParent `Maybe.andThen` (\selectedNode ->
             let targets = selectedNode |> getTargets
             in
-              if targets |> List.isEmpty then selectedNode
-              else targets |> head |> getNode
+              if targets |> List.isEmpty then Just selectedNode
+              else targets |> Array.fromList |> get index |> Maybe.map getNode
           )
     in { editorState | selection <- newSelection }
   else editorState
 
+indexOfNode : Node -> (a -> Node) -> List a -> Int 
+indexOfNode node getNode nodes =
+  nodes |> List.indexedMap (\index current ->
+    if (current |> getNode) == node then Just index else Nothing
+  ) |> Maybe.oneOf |> withDefault 0
+
+moveSelectionBy : Int -> Node -> EditorState -> EditorState
+moveSelectionBy offset modelRoot editorState =
+  case editorState.selection of
+  Just selectedNode ->
+    let maybeParent = selectedNode |> findParent modelRoot
+    in
+      case maybeParent of
+        Just parent ->
+          let index = parent |> nodeChildren |> indexOfNode selectedNode getChildNode
+              newIndex = index + offset |> Basics.max 0 |> Basics.min ((parent |> nodeChildren |> List.length) - 1)
+          in editorState |> select maybeParent newIndex nodeChildren getChildNode
+        Nothing -> editorState
+  Nothing -> editorState
+
 firstCommandId : List Command -> Maybe CommandId
-firstCommandId commands = commands |> collectCommandInfos |> indexedMap (,) |> findCommandIdByIndex 0
+firstCommandId commands = commands |> collectCommandInfos |> List.indexedMap (,) |> findCommandIdByIndex 0
 
 initialEditorState : EditorState
 initialEditorState =
@@ -318,5 +382,10 @@ controlCharacterCommands =
     case keyCode of
       9 -> SelectFirstRelatedNode
       13 -> SelectFirstChild
+      27 -> SelectParent
+      39 -> SelectNext
+      40 -> SelectNext
+      37 -> SelectPrevious
+      38 -> SelectPrevious
       _ -> Nop
   )

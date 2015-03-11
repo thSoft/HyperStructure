@@ -22,7 +22,7 @@ viewNode : EditorState -> Node -> Html
 viewNode editorState node =
   div [
     class "node",
-    onClick (EditorState.select Nothing |> send editorCommandChannel)
+    onClick (selectNode Nothing |> send editorCommandChannel)
   ] [
     node |> viewChildren editorState,
     node |> viewRelationships editorState
@@ -46,7 +46,7 @@ viewChildren editorState node =
         ("children", True),
         ("selected", selected)
       ],
-      onClick (EditorState.select (Just node) |> send editorCommandChannel),
+      onClick (selectNode (Just node) |> send editorCommandChannel),
       attribute "contextmenu" (node |> contextMenuId)
     ] (children ++ contextMenu ++ keyboardMenu)
 

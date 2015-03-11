@@ -155,7 +155,7 @@ viewKeyboardMenuItem editorState command =
             ("command", True),
             ("selected", selected)
           ]
-        ] [text |> Html.text]
+        ] [text |> Html.text] -- TODO highlight occurences of editorState.inputText
     Group { text, children } ->
       let caption = span [class "caption"] [text |> Html.text]
           childrenView = children |> List.map (viewKeyboardMenuItem editorState)

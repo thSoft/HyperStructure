@@ -1,6 +1,6 @@
 module HyperStructure.EditorState where
 
-import Basics
+import Basics (..)
 import Array (..)
 import Array
 import List (..)
@@ -69,13 +69,15 @@ select newSelection modelRoot editorState = { editorState | selection <- newSele
 
 selectFirstRelatedNode : EditorCommand
 selectFirstRelatedNode modelRoot editorState =
-  if editorState.selection |> isJust then editorState |> selectNodeAt editorState.selection 0 .relationships getRelationshipNode
-  else { editorState | selection <- Just modelRoot }
+  editorState.selection |> Maybe.map (\selectedNode ->
+    editorState |> selectNodeAt (selectedNode |> getRelationshipNodes) 0
+  ) |> withDefault { editorState | selection <- Just modelRoot }
 
 selectFirstChild : EditorCommand
 selectFirstChild modelRoot editorState = 
-  if editorState.selection |> isJust then editorState |> selectNodeAt editorState.selection 0 nodeChildren getChildNode
-  else { editorState | selection <- Just modelRoot }
+  editorState.selection |> Maybe.map (\selectedNode ->
+    editorState |> selectNodeAt (selectedNode |> getChildNodes) 0
+  ) |> withDefault { editorState | selection <- Just modelRoot }
 
 selectParent : EditorCommand
 selectParent modelRoot editorState =
@@ -126,14 +128,19 @@ filterCommands searchTerm commands =
 
 findParent : Node -> Node -> Maybe Node -- TODO optimize with zippers?
 findParent potentialParent selectedNode =
-  let found =
+  let foundAsChild =
         potentialParent.children |> List.any (\child ->
           case child of
             NodeChild { node } -> node == selectedNode
             _ -> False
         )
+      foundAsRelationship =
+        potentialParent.relationships |> List.any (\relationship ->
+          case relationship of
+            Relationship { node } -> node == selectedNode
+        )
   in
-    if found then Just potentialParent
+    if foundAsChild || foundAsRelationship then Just potentialParent
     else
       let childResults =
             potentialParent.children |> List.map (\child ->
@@ -148,52 +155,51 @@ findParent potentialParent selectedNode =
             )
       in (childResults ++ relationshipResults) |> Maybe.oneOf
 
-nodeChildren : Node -> List Child
-nodeChildren node =
-  node.children |> List.filter (\child ->
-    case child of
-      NodeChild _ -> True
-      _ -> False
+getRelationshipNodes : Node -> List Node
+getRelationshipNodes parentNode =
+  parentNode.relationships |> List.concatMap (\relationship ->
+    case relationship of
+      Relationship { node } -> [node]
+      _ -> []
   )
 
-getRelationshipNode : Relationship -> Node
-getRelationshipNode relationship = case relationship of Relationship { node } -> node
+getChildNodes : Node -> List Node
+getChildNodes parentNode =
+  parentNode.children |> List.concatMap (\child ->
+    case child of
+      NodeChild { node } -> [node]
+      _ -> []
+  )
 
-getChildNode : Child -> Node
-getChildNode child = case child of NodeChild { node } -> node
-
-selectNodeAt : Maybe Node -> Int -> (Node -> List a) -> (a -> Node) -> EditorState -> EditorState
-selectNodeAt maybeParent index getTargets getNode editorState =
+selectNodeAt : List Node -> Int -> EditorState -> EditorState
+selectNodeAt nodes index editorState =
   if editorState.inputText |> String.isEmpty then
     let newSelection =
-          maybeParent `Maybe.andThen` (\selectedNode ->
-            let targets = selectedNode |> getTargets
-            in
-              if targets |> List.isEmpty then Just selectedNode
-              else targets |> Array.fromList |> get index |> Maybe.map getNode
-          )
+          if nodes |> List.isEmpty then editorState.selection
+          else nodes |> Array.fromList |> get index
     in { editorState | selection <- newSelection }
   else editorState
 
-indexOfNode : Node -> (a -> Node) -> List a -> Int 
-indexOfNode node getNode nodes =
+indexOfNode : List Node -> Node -> Int 
+indexOfNode nodes node =
   nodes |> List.indexedMap (\index current ->
-    if (current |> getNode) == node then Just index else Nothing
+    if current == node then Just index else Nothing
   ) |> Maybe.oneOf |> withDefault 0
 
 moveSelectionBy : Int -> Node -> EditorState -> EditorState
 moveSelectionBy offset modelRoot editorState =
   case editorState.selection of
-  Just selectedNode ->
-    let maybeParent = selectedNode |> findParent modelRoot
-    in
-      case maybeParent of
-        Just parent ->
-          let index = parent |> nodeChildren |> indexOfNode selectedNode getChildNode
-              newIndex = index + offset |> Basics.max 0 |> Basics.min ((parent |> nodeChildren |> List.length) - 1)
-          in editorState |> selectNodeAt maybeParent newIndex nodeChildren getChildNode
-        Nothing -> editorState
-  Nothing -> editorState
+    Just selectedNode ->
+      let maybeParent = selectedNode |> findParent modelRoot
+      in
+        case maybeParent of
+          Just parent ->
+            let nodesOnSameLevel = parent |> getChildNodes
+                index = selectedNode |> indexOfNode nodesOnSameLevel
+                newIndex = index + offset |> max 0 |> min ((nodesOnSameLevel |> List.length) - 1)
+            in editorState |> selectNodeAt nodesOnSameLevel newIndex
+          Nothing -> editorState
+    Nothing -> editorState
 
 firstCommandId : List Command -> Maybe CommandId
 firstCommandId commands = commands |> collectCommandInfos |> List.indexedMap (,) |> findCommandIdByIndex 0

@@ -128,7 +128,7 @@ filterCommands : String -> List Command -> List Command
 filterCommands searchTerm commands =
   commands |> concatMap (\command ->
     case command of
-      Command { text } -> if text `containsIgnoreCase` searchTerm then [command] else [] -- TODO fuzzy contains
+      Command { text } -> if text `fuzzyContains` searchTerm then [command] else []
       Group { text, children } -> 
         let filteredChildren = children |> filterCommands searchTerm
         in if filteredChildren |> List.isEmpty then [] else [Group { text = text, children = filteredChildren }]

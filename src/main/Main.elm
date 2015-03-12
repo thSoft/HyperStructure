@@ -135,7 +135,7 @@ foo =
       ] |> filterCommands input)
   }
 
-functions = ["+", "-", "*", "/"]
+functions = ["+", "-", "*", "/", "square root"]
 
 textNode : String -> String -> Node
 textNode id text =

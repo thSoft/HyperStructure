@@ -14,6 +14,14 @@ insertAtMiddle toInsert original =
 containsIgnoreCase : String -> String -> Bool
 containsIgnoreCase haystack needle = haystack |> toLower |> contains (needle |> toLower)
 
+fuzzyContains : String -> String -> Bool
+fuzzyContains haystack needle =
+  let words = needle |> split " "
+  in
+    words |> List.all (\word ->
+      haystack `containsIgnoreCase` word
+    )
+
 isJust : Maybe a -> Bool
 isJust maybe =
   case maybe of

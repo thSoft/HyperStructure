@@ -1,5 +1,6 @@
 module HyperStructure.View where
 
+import List (..)
 import List
 import Maybe (..)
 import Maybe
@@ -12,6 +13,7 @@ import Svg (..)
 import Svg
 import Svg.Attributes as SvgAttr
 import Signal (..)
+import String (..)
 import String
 import HyperStructure.Model (..)
 import HyperStructure.Util (..)
@@ -155,7 +157,7 @@ viewKeyboardMenuItem editorState command =
             ("command", True),
             ("selected", selected)
           ]
-        ] [text |> Html.text] -- TODO highlight occurences of editorState.inputText
+        ] [text `highlightOccurencesOfWords` editorState.inputText]
     Group { text, children } ->
       let caption = span [class "caption"] [text |> Html.text]
           childrenView = children |> List.map (viewKeyboardMenuItem editorState)

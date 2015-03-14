@@ -28,33 +28,32 @@ containsIgnoreCase haystack needle = haystack |> Regex.contains (needle |> escap
 highlightOccurencesOfWords : String -> String -> Html
 highlightOccurencesOfWords haystack needle =
   let words = needle |> String.words |> List.filter (\word -> not (word |> String.isEmpty))
-      occurences =
+      matches =
         words |> concatMap (\word ->
           haystack |> find All (word |> escape |> regex |> caseInsensitive)
-        ) |> List.map (\match ->
-          { start = match.index, end = match.index + (match.match |> String.length) - 1 }
         )
-      initialPartitions = [{ start = 0, end = (haystack |> String.length) - 1 }]
-      partitions =
-        occurences |> List.foldr (\occurence currentPartitions ->
-          currentPartitions |> concatMap (subdivide occurence)
-        ) initialPartitions |> sortBy .start
+      appendIndexedCharToSegments (index, char) segments =
+        let matching =
+              matches |> List.any (\match ->
+                match.index <= index && index < match.index + (match.match |> String.length)
+              )
+            charAsString = char |> fromChar
+        in
+          if (segments |> List.isEmpty) || ((segments |> head).matching /= matching) then
+            { string = charAsString, matching = matching } :: segments
+          else
+            let lastSegment = segments |> head
+                lastSegmentAugmented = { lastSegment | string <- lastSegment.string |> String.append charAsString }
+            in lastSegmentAugmented :: (segments |> tail)
+      segments = haystack |> toList |> indexedMap (,) |> List.foldr appendIndexedCharToSegments []
       children =
-        partitions |> List.map (\partition ->
-          let subtext = haystack |> slice partition.start (partition.end + 1) |> text
-          in if occurences |> member partition then strong [] [subtext] else subtext
+        segments |> List.map (\segment ->
+          let segmentText = segment.string |> text
+          in if segment.matching then strong [] [segmentText] else segmentText
         )
   in span [] children
 
-subdivide : IntRange -> IntRange -> List IntRange
-subdivide subrange range =
-  let first = if range.start < subrange.start then [{ start = range.start, end = min (subrange.start - 1) range.end }] else []
-      second = if range.start <= subrange.start && subrange.end <= range.end then [subrange] else []
-      third = if subrange.end < range.end then [{ start = max range.start (subrange.end + 1), end = range.end }] else []
-  in first ++ second ++ third
-
--- both inclusive
-type alias IntRange = {
-  start: Int,
-  end: Int
+type alias Segment = {
+  string: String,
+  matching: Bool
 }

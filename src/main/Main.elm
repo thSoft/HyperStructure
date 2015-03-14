@@ -114,25 +114,25 @@ foo =
       }
     ],
     commandsWithInput input =
-      [
+      ([
+        Group {
+          text = "Surround with",
+          children =
+            functions |> List.map (\function ->
+              Command {
+                id = ["Surround", function],
+                text = function,
+                message = (Surround |> send mainCommandChannel)
+              }
+            )
+        }
+      ] |> filterCommands input) ++ [
         Command {
           id = ["Rename"],
           text = "Rename to: " ++ input,
           message = (Rename |> send mainCommandChannel)
         }
-      ] ++ ([
-        Group {
-          text = "Replace with",
-          children =
-            functions |> List.map (\function ->
-              Command {
-                id = ["Replace", function],
-                text = function,
-                message = (Replace |> send mainCommandChannel)
-              }
-            )
-        }
-      ] |> filterCommands input)
+      ]
   }
 
 functions = ["+", "-", "*", "/", "square root"]
@@ -156,4 +156,4 @@ type MainCommand =
   Nop |
   ShowValue |
   Rename |
-  Replace
+  Surround

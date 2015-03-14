@@ -40,11 +40,12 @@ highlightOccurencesOfWords haystack needle =
             charAsString = char |> fromChar
         in
           if (segments |> List.isEmpty) || ((segments |> head).matching /= matching) then
-            { string = charAsString, matching = matching } :: segments
+            let newSegment = { string = charAsString, matching = matching }
+            in newSegment :: segments
           else
             let lastSegment = segments |> head
-                lastSegmentAugmented = { lastSegment | string <- lastSegment.string |> String.append charAsString }
-            in lastSegmentAugmented :: (segments |> tail)
+                lastSegmentContinued = { lastSegment | string <- lastSegment.string |> String.append charAsString }
+            in lastSegmentContinued :: (segments |> tail)
       segments = haystack |> toList |> indexedMap (,) |> List.foldr appendIndexedCharToSegments []
       children =
         segments |> List.map (\segment ->

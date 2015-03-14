@@ -8,6 +8,8 @@ import Regex
 import List (..)
 import List
 import Html (..)
+import IntRange (..)
+import IntRange
 
 insertAtMiddle : List a -> List a -> List a
 insertAtMiddle toInsert original =
@@ -32,29 +34,29 @@ highlightOccurencesOfWords haystack needle =
         words |> concatMap (\word ->
           haystack |> find All (word |> escape |> regex |> caseInsensitive)
         )
-      appendIndexedCharToSegments (index, char) segments =
+      buildSegments index segments =
         let matching =
               matches |> List.any (\match ->
                 match.index <= index && index < match.index + (match.match |> String.length)
               )
-            charAsString = char |> fromChar
         in
           if (segments |> List.isEmpty) || ((segments |> head).matching /= matching) then
-            let newSegment = { string = charAsString, matching = matching }
+            let newSegment = { start = index, end = index + 1, matching = matching }
             in newSegment :: segments
           else
             let lastSegment = segments |> head
-                lastSegmentContinued = { lastSegment | string <- lastSegment.string |> String.append charAsString }
+                lastSegmentContinued = { lastSegment | end <- index + 1 }
             in lastSegmentContinued :: (segments |> tail)
-      segments = haystack |> toList |> indexedMap (,) |> List.foldr appendIndexedCharToSegments []
+      segments = (0 `to` ((haystack |> String.length) - 1)) |> IntRange.foldl buildSegments [] |> List.reverse
       children =
         segments |> List.map (\segment ->
-          let segmentText = segment.string |> text
+          let segmentText = haystack |> String.slice segment.start segment.end |> text
           in if segment.matching then strong [] [segmentText] else segmentText
         )
   in span [] children
 
 type alias Segment = {
-  string: String,
+  start: Int,
+  end: Int,
   matching: Bool
 }

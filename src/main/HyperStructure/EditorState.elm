@@ -180,7 +180,7 @@ moveSelectionBy offset modelRoot editorState =
           relationshipNodes = parent |> getRelationshipNodes
           relevantNodes = if childNodes |> member selectedNode then childNodes else relationshipNodes
           index = relevantNodes |> indexOfNode selectedNode
-          newIndex = index + offset |> max 0 |> min ((relevantNodes |> List.length) - 1)
+          newIndex = index + offset |> clamp 0 ((relevantNodes |> List.length) - 1)
       in editorState |> selectNodeAt relevantNodes newIndex
     )
   ) |> withDefault editorState

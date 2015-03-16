@@ -21,48 +21,30 @@ node : Node
 node =
   {
     id = "mainExpression",
-    children = [
-      NodeChild {
-        node = foo
-      },
-      ContentChild { content = "+" |> text },
-      NodeChild {
-        node = {
-          id = "subexpression",
-          children = [
-            NodeChild {
-              node = {
-                id = "literal",
-                children = [
-                  ContentChild { content = "2" |> text }
-                ],
-                relationships = [],
-                commands = [],
-                commandsWithInput = always []
+    content = ChildrenContent [
+      foo,
+      "+" |> textNode "mainExpressionPlus",
+      {
+        id = "subexpression",
+        content = ChildrenContent [
+          "2" |> textNode "literal",
+          "*" |> textNode "subExpressionMultiply",
+          {
+            id = "bar",
+            content = HtmlContent ("bar" |> text),
+            relationships = [
+              Relationship {
+                text = "value",
+                node = "1" |> textNode "barValue"
               }
-            },
-            ContentChild { content = "*" |> text },
-            NodeChild {
-              node = {
-                id = "bar",
-                children = [
-                  ContentChild { content = "bar" |> text }
-                ],
-                relationships = [
-                  Relationship {
-                    text = "value",
-                    node = "1" |> textNode "barValue"
-                  }
-                ],
-                commands = [],
-                commandsWithInput = always []
-              }
-            }
-          ],
-          relationships = [],
-          commands = [],
-          commandsWithInput = always []
-        }
+            ],
+            commands = [],
+            commandsWithInput = always []
+          }
+        ],
+        relationships = [],
+        commands = [],
+        commandsWithInput = always []
       }
     ],
     relationships = [
@@ -74,9 +56,9 @@ node =
         text = "type",
         node = {
           id = "mainExpressionType",
-          children = [
-            ContentChild { content = "number" |> Html.text },
-            NodeChild { node = "(real)" |> textNode "real" }
+          content = ChildrenContent [
+            "number" |> textNode "mainExpressionTypeMain",
+            "(real)" |> textNode "mainExpressionTypeAuxiliary"
           ],
           relationships = [],
           commands = [],
@@ -92,9 +74,7 @@ foo : Node
 foo =
   {
     id = "foo",
-    children = [
-      ContentChild { content = "foo" |> text }
-    ],
+    content = HtmlContent ("foo" |> text),
     relationships = [
       Relationship {
         text = "value",
@@ -141,9 +121,7 @@ textNode : String -> String -> Node
 textNode id text =
   {
     id = id,
-    children = [
-      ContentChild { content = text |> Html.text }
-    ],
+    content = HtmlContent (text |> Html.text),
     relationships = [],
     commands = [],
     commandsWithInput = always []

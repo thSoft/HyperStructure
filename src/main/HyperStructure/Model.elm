@@ -5,19 +5,15 @@ import Html (..)
 
 type alias Node = {
   id: String,
-  children: List Child,
+  content: Content,
   relationships: List Relationship,
   commands: List Command,
   commandsWithInput: String -> List Command
 }
 
-type Child =
-  NodeChild {
-    node: Node
-  } |
-  ContentChild {
-    content: Html
-  }
+type Content =
+  HtmlContent Html |
+  ChildrenContent (List Node)
 
 type Relationship = Relationship {
   text: String,

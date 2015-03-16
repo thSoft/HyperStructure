@@ -22,21 +22,29 @@ body {
   display: inline-block;
 }
 
-.children {
+.content {
   display: inline-block;
   background: linear-gradient(white, #ccddff);
-  border: 1px solid black;
-  border-radius: 4px;
   margin: 2px;
   padding: 2px;
   position: relative;
+  border-radius: 4px;
+  border: 1px solid darkGray;
+
+  &.children {
+    border-color: black;
+  }
 }
 
-.children.selected {
-  background: linear-gradient(white, #ffeebb);
-  border: 2px solid brown;
+.selectedNode {
+  border-width: 2px;
   box-shadow: 0 0 4px darkGray;
   padding: 1px;
+  border-color: black;
+
+  &, .content {
+    background: linear-gradient(white, #ffeebb);
+  }
 }
 
 .relationships {

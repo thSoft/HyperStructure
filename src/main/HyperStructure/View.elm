@@ -26,31 +26,34 @@ viewNode editorState node =
     class "node",
     onClick (selectNode Nothing |> send editorCommandChannel)
   ] [
-    node |> viewChildren editorState,
+    node |> viewContent editorState,
     node |> viewRelationships editorState
   ]
 
-viewChildren : EditorState -> Node -> Html
-viewChildren editorState node =
+viewContent : EditorState -> Node -> Html
+viewContent editorState node =
   let selected = editorState.selection == Just node
-      children =
-        node.children |> List.map (\child ->
-          case child of
-            ContentChild { content } -> content
-            NodeChild nodeChild -> nodeChild.node |> viewChildren editorState
-        )
+      childrenContent =
+        case node.content of
+          ChildrenContent _ -> True
+          _ -> False
+      contentView =
+        case node.content of
+          HtmlContent html -> [html]
+          ChildrenContent children -> children |> List.map (viewContent editorState)
       contextMenu = node |> viewContextMenu editorState
       keyboardMenu = node |> viewKeyboardMenu editorState
   in
     span [
       id node.id,
       classList [
-        ("children", True),
-        ("selected", selected)
+        ("content", True),
+        ("children", childrenContent),
+        ("selectedNode", selected)
       ],
       onClick (selectNode (Just node) |> send editorCommandChannel),
       attribute "contextmenu" (node |> contextMenuId)
-    ] (children ++ contextMenu ++ keyboardMenu)
+    ] (contentView ++ contextMenu ++ keyboardMenu)
 
 viewRelationships : EditorState -> Node -> Html
 viewRelationships editorState node =
@@ -61,11 +64,9 @@ getAllRelationships : Node -> List (Node, Relationship)
 getAllRelationships node =
   let ownRelationships = node.relationships |> List.map ((,) node)
       childRelationships =
-        node.children |> List.map (\child ->
-          case child of
-            ContentChild _ -> []
-            NodeChild { node } -> node |> getAllRelationships
-        )
+        case node.content of
+          HtmlContent _ -> []
+          ChildrenContent children -> children |> List.map getAllRelationships
   in childRelationships |> insertAtMiddle [ownRelationships] |> List.concat
 
 viewRelationship : EditorState -> (Node, Relationship) -> Html

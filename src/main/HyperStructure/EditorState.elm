@@ -58,7 +58,7 @@ controlCharacterCommands =
       9 -> selectFirstRelationshipNode
       13 -> selectFirstChildNode
       27 -> selectParentNode
-      39 -> selectNextNode
+      39 -> selectNextNode -- TODO leaf
       40 -> selectNextNode
       37 -> selectPreviousNode
       38 -> selectPreviousNode
@@ -149,11 +149,9 @@ findParent potentialParent selectedNode =
 
 getChildNodes : Node -> List Node
 getChildNodes parentNode =
-  parentNode.children |> List.concatMap (\child ->
-    case child of
-      NodeChild { node } -> [node]
-      _ -> []
-  )
+  case parentNode.content of
+    ChildrenContent children -> children
+    _ -> []
 
 getRelationshipNodes : Node -> List Node
 getRelationshipNodes parentNode =

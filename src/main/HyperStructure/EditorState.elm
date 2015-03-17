@@ -53,15 +53,15 @@ printingCharacterCommands charCodes =
 
 controlCharacterCommands : Signal EditorCommand
 controlCharacterCommands =
-  Keyboard.lastPressed |> Signal.map (\keyCode ->
-    case keyCode of
-      9 -> selectFirstRelationshipNode
-      13 -> selectFirstChildNode
-      27 -> selectParentNode
-      39 -> selectNextNode -- TODO leaf
-      40 -> selectNextNode
-      37 -> selectPreviousNode
-      38 -> selectPreviousNode
+   Keyboard.keysDown |> Signal.map (\keysDown ->
+    case keysDown of
+      [39] -> selectNextNode
+      [40] -> selectNextNode
+      [40, 17] -> selectFirstRelationshipNode
+      [40, 18] -> selectFirstChildNode
+      [37] -> selectPreviousNode
+      [38] -> selectPreviousNode
+      [38, 18] -> selectParentNode
       _ -> nop
   )
 
@@ -95,6 +95,7 @@ selectParentNode modelRoot editorState =
 
 selectNextNode : EditorCommand
 selectNextNode modelRoot editorState = editorState |> moveSelectionBy 1 modelRoot
+-- TODO if end of list then parent
 
 selectPreviousNode : EditorCommand
 selectPreviousNode modelRoot editorState = editorState |> moveSelectionBy -1 modelRoot

@@ -1,6 +1,7 @@
 {
   "name": "HyperStructure",
   "dependencies": {
+    "SvgConnectors": "https://github.com/thSoft/SvgConnectors.git",
     "jQuery-contextMenu": "~1.6.6",
     "jquery": "~2.1.3"
   }

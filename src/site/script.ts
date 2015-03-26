@@ -11,7 +11,6 @@ window.onload = () => {
   var elm = Elm.embed(Elm.Main, mainElement, {
     charCodes: 0
   });
-  SvgConnectors.manage();
   $(document).bind("keypress", event => {
     elm.ports.charCodes.send(event.charCode);
   });

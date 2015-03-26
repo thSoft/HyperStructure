@@ -57,7 +57,6 @@ controlCharacterCommands =
     case keysDown of
       [39] -> selectNextNode
       [40] -> selectNextNode
-      [40, 17] -> selectFirstRelationshipNode
       [40, 18] -> selectFirstChildNode
       [37] -> selectPreviousNode
       [38] -> selectPreviousNode
@@ -72,12 +71,6 @@ nop modelRoot editorState = editorState
 
 selectNode : Selection -> EditorCommand
 selectNode newSelection modelRoot editorState = { editorState | selection <- newSelection, inputText <- "" }
-
-selectFirstRelationshipNode : EditorCommand
-selectFirstRelationshipNode modelRoot editorState =
-  editorState.selection |> Maybe.map (\selectedNode ->
-    editorState |> selectNodeAt (selectedNode |> getRelationshipNodes) 0
-  ) |> withDefault { editorState | selection <- Just modelRoot }
 
 selectFirstChildNode : EditorCommand
 selectFirstChildNode modelRoot editorState = 
@@ -138,29 +131,16 @@ filterCommands searchTerm commands =
 findParent : Node -> Node -> Maybe Node -- TODO optimize with zippers?
 findParent potentialParent selectedNode =
   let childNodes = potentialParent |> getChildNodes
-      relationshipNodes = potentialParent |> getRelationshipNodes
       foundAsChild = childNodes |> member selectedNode
-      foundAsRelationship = relationshipNodes |> member selectedNode
   in
-    if foundAsChild || foundAsRelationship then Just potentialParent
-    else
-      let childResults = childNodes |> List.map (\childNode -> selectedNode |> findParent childNode)
-          relationshipResults = relationshipNodes |> List.map (\relationshipNode -> selectedNode |> findParent relationshipNode)
-      in (childResults ++ relationshipResults) |> Maybe.oneOf
+    if foundAsChild then Just potentialParent
+    else childNodes |> List.map (\childNode -> selectedNode |> findParent childNode) |> Maybe.oneOf
 
 getChildNodes : Node -> List Node
 getChildNodes parentNode =
   case parentNode.content of
     ChildrenContent children -> children
     _ -> []
-
-getRelationshipNodes : Node -> List Node
-getRelationshipNodes parentNode =
-  parentNode.relationships |> List.concatMap (\relationship ->
-     case relationship of
-       Relationship { node } -> [node]
-       _ -> []
-   )
 
 selectNodeAt : List Node -> Int -> EditorState -> EditorState
 selectNodeAt nodes index editorState =
@@ -176,11 +156,9 @@ moveSelectionBy offset modelRoot editorState =
   editorState.selection `andThen` (\selectedNode ->
     selectedNode |> findParent modelRoot |> Maybe.map (\parent ->
       let childNodes = parent |> getChildNodes
-          relationshipNodes = parent |> getRelationshipNodes
-          relevantNodes = if childNodes |> member selectedNode then childNodes else relationshipNodes
-          index = relevantNodes |> indexOfNode selectedNode
-          newIndex = index + offset |> clamp 0 ((relevantNodes |> List.length) - 1)
-      in editorState |> selectNodeAt relevantNodes newIndex
+          index = childNodes |> indexOfNode selectedNode
+          newIndex = index + offset |> clamp 0 ((childNodes |> List.length) - 1)
+      in editorState |> selectNodeAt childNodes newIndex
     )
   ) |> withDefault editorState
 

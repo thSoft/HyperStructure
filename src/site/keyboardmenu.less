@@ -1,0 +1,46 @@
+.keyboardMenu {
+  .bordered() {
+    border: 1px groove lightGray;
+    border-radius: 4px;
+    padding-bottom: 2px;
+  }
+  @padding: 2px 0.8em 2px 0.8em;
+
+  position: absolute;
+  left: 0;
+  top: 110%;
+  z-index: 1;
+  background: #F6F6F6;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+  text-align: left;
+  color: black;
+  .bordered;
+  
+  input {
+    width: 92%;
+    min-width: 10em;
+    margin: 2px;
+    border-radius: 4px;
+  }
+
+  .command.selected {
+    background-color: #006CD2;
+    color: white;
+  }
+
+  .command {
+    color: black;
+    padding: @padding;
+  }
+
+  .group {
+    color: darkGray;
+    .bordered;
+    margin: 1px 0.4em 1px 0.4em;
+    padding-top: 2px;
+
+    .caption {
+      padding: @padding;
+    }
+  }
+}

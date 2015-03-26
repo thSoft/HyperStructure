@@ -32,38 +32,12 @@ node =
           {
             id = "bar",
             content = HtmlContent ("bar" |> text),
-            relationships = [
-              Relationship {
-                text = "value",
-                node = "1" |> textNode "barValue"
-              }
-            ],
             commands = [],
             commandsWithInput = always []
           }
         ],
-        relationships = [],
         commands = [],
         commandsWithInput = always []
-      }
-    ],
-    relationships = [
-      Relationship {
-        text = "value",
-        node = "44" |> textNode "mainExpressionValue"
-      },
-      Relationship {
-        text = "type",
-        node = {
-          id = "mainExpressionType",
-          content = ChildrenContent [
-            "number" |> textNode "mainExpressionTypeMain",
-            "(real)" |> textNode "mainExpressionTypeAuxiliary"
-          ],
-          relationships = [],
-          commands = [],
-          commandsWithInput = always []
-        }
       }
     ],
     commands = [],
@@ -75,12 +49,6 @@ foo =
   {
     id = "foo",
     content = HtmlContent ("foo" |> text),
-    relationships = [
-      Relationship {
-        text = "value",
-        node = "42" |> textNode "fooValue"
-      }
-    ],
     commands = [
       Group {
         text = "Show",
@@ -122,7 +90,6 @@ textNode id text =
   {
     id = id,
     content = HtmlContent (text |> Html.text),
-    relationships = [],
     commands = [],
     commandsWithInput = always []
   }

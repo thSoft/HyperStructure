@@ -1,16 +1,20 @@
 {
     "version": "1.0.0",
-    "summary": "HyperStructure",
+    "summary": "Structural editor framework",
     "repository": "https://github.com/thSoft/HyperStructure.git",
     "license": "BSD3",
     "source-directories": [
         "../src/main"
     ],
-    "exposed-modules": [],
+    "exposed-modules": [
+        "HyperStructure.Model",
+        "HyperStructure.Util",
+        "HyperStructure.EditorState",
+        "HyperStructure.View"
+    ],
     "dependencies": {
         "elm-lang/core": "1.1.1 <= v < 2.0.0",
         "evancz/elm-html": "2.0.0 <= v < 3.0.0",
-        "evancz/elm-svg": "1.0.1 <= v < 2.0.0",
         "uehaj/IntRange": "1.0.1 <= v < 2.0.0"
     }
 }

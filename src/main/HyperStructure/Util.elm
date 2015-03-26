@@ -11,13 +11,6 @@ import Html (..)
 import IntRange (..)
 import IntRange
 
-insertAtMiddle : List a -> List a -> List a
-insertAtMiddle toInsert original =
-  let half = (original |> List.length) // 2
-      firstHalf = original |> take half
-      secondHalf = original |> drop half
-  in [firstHalf, toInsert, secondHalf] |> List.concat
-
 fuzzyContains : String -> String -> Bool
 fuzzyContains haystack needle =
   needle |> words |> List.all (\word ->

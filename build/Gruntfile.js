@@ -73,7 +73,10 @@ module.exports = function(grunt) {
 		typescript : {
 			site : {
 				src : siteScripts,
-				dest : compiledSiteScripts
+				dest : compiledSiteScripts,
+				options : {
+					target: 'es6'
+				}
 			}
 		},
 		less : {

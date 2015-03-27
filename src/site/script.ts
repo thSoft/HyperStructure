@@ -7,14 +7,14 @@ interface Elm {
 }
 
 window.onload = () => {
-  var mainElement = document.getElementById("main");
-  var elm = Elm.embed(Elm.Main, mainElement, {
+  const mainElement = document.getElementById("main");
+  const elm = Elm.embed(Elm.Main, mainElement, {
     charCodes: 0
   });
   $(document).bind("keypress", event => {
     elm.ports.charCodes.send(event.charCode);
   });
-  var observer = new MutationObserver(mutations => {
+  const observer = new MutationObserver(mutations => {
     mutations.forEach(mutation => {
       MiscUtils.toArray(mutation.addedNodes).forEach(handleAutofocus);
     });
@@ -28,10 +28,10 @@ window.onload = () => {
 
 function handleAutofocus(node: Node) {
   if (node instanceof HTMLInputElement) {
-    var element = <HTMLInputElement>node;
+    const element = <HTMLInputElement>node;
     if (element.autofocus) {
       element.focus();
-      var position = 1;
+      const position = 1;
       element.setSelectionRange(position, position);
     }
   } else {
